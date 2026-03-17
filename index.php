@@ -410,7 +410,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 /* ---- FOOTER ---- */
 footer{text-align:center;padding:2rem;font-size:.8rem;color:var(--gray);position:relative}
-#logo-alc{position:fixed;bottom:1.25rem;right:1.25rem;max-height:56px;width:auto;opacity:.85;pointer-events:none}
+#logo-alc{position:fixed;bottom:1.25rem;right:1.25rem;max-height:112px;width:auto;opacity:.85;pointer-events:none}
 footer span{color:var(--red);font-weight:700}
 </style>
 </head>
