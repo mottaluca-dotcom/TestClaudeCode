@@ -440,7 +440,7 @@ footer span{color:var(--red);font-weight:700}
 <!-- ===== HERO ===== -->
 <div class="hero">
   <h1>ALC <span>365°</span></h1>
-  <p>Le APP di ALC a portata di un click</p>
+  <p>Dove il lavoro diventa semplice</p>
 </div>
 <?php endif; ?>
 
