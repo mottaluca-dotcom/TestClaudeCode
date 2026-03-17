@@ -399,17 +399,19 @@ if ($p === 'dettaglio') {
 }
 
 $apps = [];
-$search = $bu_f = $settore_f = '';
+$search = $bu_f = $settore_f = $alc_f = '';
 if ($p === 'database') {
     $search   = trim($_GET['q']       ?? '');
     $bu_f     = $_GET['bu']           ?? '';
     $settore_f= $_GET['settore']      ?? '';
+    $alc_f    = trim($_GET['alc']     ?? '');
     $sql      = "SELECT a.*, u.nome as inserito_da
                  FROM applicazioni a LEFT JOIN users u ON a.user_id=u.id WHERE 1=1";
     $params   = [];
     if ($search)    { $sql .= " AND (a.cliente LIKE ? OR a.prodotto_alc LIKE ? OR a.problema LIKE ? OR a.regione LIKE ?)"; $params = array_merge($params, ["%$search%","%$search%","%$search%","%$search%"]); }
     if ($bu_f)      { $sql .= " AND a.business_unit=?"; $params[] = $bu_f; }
     if ($settore_f) { $sql .= " AND a.settore=?";       $params[] = $settore_f; }
+    if ($alc_f)     { $sql .= " AND a.prodotto_alc=?";  $params[] = $alc_f; }
     $sql .= " ORDER BY a.created_at DESC";
     $stmt = db()->prepare($sql); $stmt->execute($params);
     $apps = $stmt->fetchAll();
@@ -841,6 +843,22 @@ select.form-control{cursor:pointer}
 }
 .filter-select:focus{outline:none;border-color:var(--blue2)}
 .db-count{font-size:.82rem;color:var(--gray);margin-left:auto}
+.db-filters-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;width:100%}
+.db-filters-radios{padding:.25rem 0}
+.filter-label{font-size:.78rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.filter-sep{color:var(--border);font-size:1.2rem;margin:0 .15rem}
+.filter-radio{
+  display:inline-flex;align-items:center;gap:.3rem;
+  padding:.35rem .75rem;
+  border-radius:50px;
+  border:2px solid var(--border);
+  font-size:.82rem;font-weight:500;color:var(--gray);
+  cursor:pointer;transition:var(--trans);
+  user-select:none;white-space:nowrap;
+}
+.filter-radio input{display:none}
+.filter-radio:hover{border-color:var(--blue2);color:var(--blue2)}
+.filter-radio.active{border-color:var(--blue2);background:rgba(209,42,47,.08);color:var(--blue2);font-weight:600}
 
 .db-table-wrap{
   background:var(--card);
@@ -1046,8 +1064,8 @@ elseif ($p === 'welcome'): ?>
 <div class="page">
   <!-- HERO -->
   <div class="welcome-hero">
-    <h1>Benvenuto in <span>BAM</span></h1>
-    <p>Una piattaforma per organizzare e condividere il know-how applicativo<br>al servizio dello sviluppo commerciale.</p>
+    <h1><span>BAM</span></h1>
+    <p><strong>B</strong>ond <strong>A</strong>pplication <strong>M</strong>anagement</p>
     <div class="welcome-ctas">
       <a href="?p=inserimento" class="btn btn-outline btn-lg" style="border-color:rgba(255,255,255,.6);color:#fff;background:rgba(255,255,255,.12)">
         <?= icon('plus') ?> Inserisci Applicazione
@@ -1288,28 +1306,60 @@ elseif ($p === 'database'): ?>
   </div>
 
   <!-- FILTERS -->
-  <form method="GET" action="?" class="db-filters">
+  <form method="GET" action="?" class="db-filters" id="dbFiltersForm">
     <input type="hidden" name="p" value="database">
-    <div class="db-search">
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" name="q" placeholder="Cerca cliente, prodotto, problema..." value="<?= h($search) ?>">
+
+    <!-- riga 1: testo libero -->
+    <div class="db-filters-row">
+      <div class="db-search" style="flex:1;min-width:200px">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" placeholder="Cerca cliente, regione, problema..." value="<?= h($search) ?>">
+      </div>
+
+      <!-- ALC autocomplete -->
+      <div class="db-alc-wrap" style="position:relative;flex:1;min-width:160px">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);width:1rem;height:1rem;color:var(--gray2);pointer-events:none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        <input type="text" id="dbAlcInput" autocomplete="off"
+               placeholder="Codice ALC..."
+               value="<?= h($alc_f) ?>"
+               style="width:100%;padding:.6rem .9rem .6rem 2.4rem;border:2px solid var(--border);border-radius:50px;font-size:.9rem;background:var(--light);transition:var(--trans);color:#1a1a1a">
+        <input type="hidden" name="alc" id="dbAlcHidden" value="<?= h($alc_f) ?>">
+        <div id="dbAlcDropdown" class="alc-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius2);box-shadow:var(--shadow2);z-index:200;max-height:220px;overflow-y:auto"></div>
+      </div>
     </div>
-    <select name="bu" class="filter-select" onchange="this.form.submit()">
-      <option value="">Tutte le BU</option>
-      <option value="K System"  <?= $bu_f==='K System'?'selected':'' ?>>K System</option>
-      <option value="K Thermo" <?= $bu_f==='K Thermo'?'selected':'' ?>>K Thermo</option>
-    </select>
-    <select name="settore" class="filter-select" onchange="this.form.submit()">
-      <option value="">Tutti i settori</option>
+
+    <!-- riga 2: radio BU -->
+    <div class="db-filters-row db-filters-radios">
+      <span class="filter-label">BU:</span>
+      <label class="filter-radio <?= $bu_f===''?'active':'' ?>">
+        <input type="radio" name="bu" value="" <?= $bu_f===''?'checked':'' ?> onchange="this.form.submit()"> Tutte
+      </label>
+      <label class="filter-radio <?= $bu_f==='K System'?'active':'' ?>">
+        <input type="radio" name="bu" value="K System" <?= $bu_f==='K System'?'checked':'' ?> onchange="this.form.submit()"> K System
+      </label>
+      <label class="filter-radio <?= $bu_f==='K Thermo'?'active':'' ?>">
+        <input type="radio" name="bu" value="K Thermo" <?= $bu_f==='K Thermo'?'checked':'' ?> onchange="this.form.submit()"> K Thermo
+      </label>
+      <span class="filter-sep">|</span>
+      <span class="filter-label">Settore:</span>
+      <label class="filter-radio <?= $settore_f===''?'active':'' ?>">
+        <input type="radio" name="settore" value="" <?= $settore_f===''?'checked':'' ?> onchange="this.form.submit()"> Tutti
+      </label>
       <?php foreach (['Calzatura','Pelletteria','Industria'] as $s): ?>
-      <option value="<?= h($s) ?>" <?= $settore_f===$s?'selected':'' ?>><?= h($s) ?></option>
+      <label class="filter-radio <?= $settore_f===$s?'active':'' ?>">
+        <input type="radio" name="settore" value="<?= h($s) ?>" <?= $settore_f===$s?'checked':'' ?> onchange="this.form.submit()"> <?= h($s) ?>
+      </label>
       <?php endforeach; ?>
-    </select>
-    <button type="submit" class="btn btn-primary btn-sm"><?= icon('search') ?> Cerca</button>
-    <?php if ($search || $bu_f || $settore_f): ?>
-    <a href="?p=database" class="btn btn-sm" style="background:var(--light);color:var(--gray)">✕ Reset</a>
-    <?php endif; ?>
-    <span class="db-count"><?= count($apps) ?> risultat<?= count($apps)===1?'o':'i' ?></span>
+    </div>
+
+    <!-- riga 3: azioni -->
+    <div class="db-filters-row">
+      <button type="submit" class="btn btn-primary btn-sm"><?= icon('search') ?> Cerca</button>
+      <?php if ($search || $bu_f || $settore_f || $alc_f): ?>
+      <a href="?p=database" class="btn btn-sm" style="background:var(--light);color:var(--gray)">✕ Reset</a>
+      <?php endif; ?>
+      <span class="db-count"><?= count($apps) ?> risultat<?= count($apps)===1?'o':'i' ?></span>
+    </div>
   </form>
 
   <?php if (empty($apps)): ?>
@@ -1329,7 +1379,6 @@ elseif ($p === 'database'): ?>
           <th>Regione</th>
           <th>Cliente</th>
           <th>Prodotto ALC</th>
-          <th>Data</th>
           <th></th>
         </tr>
       </thead>
@@ -1347,7 +1396,6 @@ elseif ($p === 'database'): ?>
           <td data-label="Regione"><?= h($app['regione']) ?></td>
           <td data-label="Cliente"><?= h($app['cliente']) ?></td>
           <td data-label="Prodotto ALC"><strong><?= h($app['prodotto_alc']) ?></strong></td>
-          <td data-label="Data" class="text-gray"><?= date('d/m/Y', strtotime($app['created_at'])) ?></td>
           <td class="action-cell">
             <a href="?p=dettaglio&id=<?= $app['id'] ?>" class="btn btn-sm btn-outline" onclick="event.stopPropagation()"><?= icon('eye') ?></a>
           </td>
@@ -1756,6 +1804,65 @@ if (ua) {
         });
     }
   }
+})();
+
+// ---- DB ALC Autocomplete (filtro database) ----
+(function(){
+  const inp  = document.getElementById('dbAlcInput');
+  const hid  = document.getElementById('dbAlcHidden');
+  const drop = document.getElementById('dbAlcDropdown');
+  if (!inp) return;
+  let timer = null, data = [];
+
+  function getFilterBU() {
+    const r = document.querySelector('#dbFiltersForm input[name="bu"]:checked');
+    return r ? r.value : '';
+  }
+
+  function render(items) {
+    drop.innerHTML = '';
+    if (!items.length) {
+      drop.innerHTML = '<div class="alc-empty">Nessun codice trovato</div>';
+      drop.style.display = 'block'; return;
+    }
+    items.forEach(item => {
+      const d = document.createElement('div');
+      d.className = 'alc-item';
+      const sub = [item.tipo, item.attributo].filter(Boolean).join(' · ');
+      d.innerHTML = `<span class="alc-item-code">${item.codice}</span>${sub ? `<span class="alc-item-sub">${sub}</span>` : ''}`;
+      d.addEventListener('mousedown', e => {
+        e.preventDefault();
+        inp.value = item.codice; hid.value = item.codice;
+        drop.style.display = 'none';
+      });
+      drop.appendChild(d);
+    });
+    drop.style.display = 'block';
+  }
+
+  function doFetch(q) {
+    const bu = getFilterBU();
+    const url = `?p=api&action=prodotti&bu=${encodeURIComponent(bu)}&q=${encodeURIComponent(q)}`;
+    fetch(url).then(r => r.json()).then(d => { data = d; render(d); }).catch(() => { drop.style.display = 'none'; });
+  }
+
+  inp.addEventListener('input', () => {
+    hid.value = '';
+    clearTimeout(timer);
+    timer = setTimeout(() => doFetch(inp.value.trim()), 220);
+  });
+
+  inp.addEventListener('focus', () => { doFetch(inp.value.trim()); });
+
+  inp.addEventListener('blur', () => {
+    setTimeout(() => {
+      drop.style.display = 'none';
+      if (inp.value.trim() && !hid.value) {
+        const exact = data.find(d => d.codice === inp.value.trim());
+        if (exact) { hid.value = exact.codice; } else { inp.value = hid.value = ''; }
+      }
+    }, 180);
+  });
 })();
 
 // Auto-hide flash
