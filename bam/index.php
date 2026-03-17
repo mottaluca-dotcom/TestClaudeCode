@@ -209,7 +209,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'note'          => trim($_POST['note']     ?? ''),
         ];
         $errs = [];
-        $required = ['business_unit','settore','regione','cliente','problema','prodotto_alc'];
+        // Settore non applicabile per K Thermo
+        if ($data['business_unit'] === 'K Thermo') $data['settore'] = '';
+        $required = ['business_unit','regione','cliente','problema','prodotto_alc'];
+        if ($data['business_unit'] !== 'K Thermo') $required[] = 'settore';
         foreach ($required as $k) if (!$data[$k]) $errs[] = $k;
         // Codice deve esistere nella tabella prodotti_alc con la BU selezionata
         if ($data['prodotto_alc'] && $data['business_unit']) {
@@ -1182,7 +1185,7 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
             $checked = ($fd['business_unit'] ?? '') === $bu;
           ?>
           <label class="radio-opt <?= in_array('business_unit',$fe)?'border-red':'' ?> <?= $checked?'checked':'' ?> <?= !$canAna?'disabled-opt':'' ?>">
-            <input type="radio" name="business_unit" value="<?= h($bu) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required>
+            <input type="radio" name="business_unit" value="<?= h($bu) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required onchange="toggleSettoreCard(this.value)">
             <span class="radio-dot"></span>
             <?= h($bu) ?>
           </label>
@@ -1190,14 +1193,14 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
         </div>
       </div>
 
-      <div class="form-card <?= !$canAna ? 'section-readonly' : '' ?>" style="margin-bottom:0">
+      <div id="settore-card" class="form-card <?= !$canAna ? 'section-readonly' : '' ?>" style="margin-bottom:0;<?= ($fd['business_unit']??'')==='K Thermo'?'display:none':''; ?>">
         <div class="form-card-title"><?= icon('filter') ?> Settore <span style="color:var(--red);margin-left:.2rem">*</span></div>
         <div class="radio-group">
           <?php foreach (['Calzatura','Pelletteria','Industria'] as $s):
             $checked = ($fd['settore'] ?? '') === $s;
           ?>
           <label class="radio-opt gold-check <?= $checked?'checked':'' ?> <?= !$canAna?'disabled-opt':'' ?>">
-            <input type="radio" name="settore" value="<?= h($s) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required>
+            <input type="radio" name="settore" value="<?= h($s) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?>>
             <span class="radio-dot"></span>
             <?= h($s) ?>
           </label>
@@ -1655,6 +1658,24 @@ elseif ($p === 'dettaglio' && $app):
 </footer>
 
 <script>
+// Mostra/nasconde il card Settore in base alla BU selezionata
+function toggleSettoreCard(bu) {
+  const card = document.getElementById('settore-card');
+  if (!card) return;
+  if (bu === 'K Thermo') {
+    card.style.display = 'none';
+    card.querySelectorAll('input[type=radio]').forEach(r => { r.checked = false; r.disabled = true; });
+  } else {
+    card.style.display = '';
+    card.querySelectorAll('input[type=radio]').forEach(r => { r.disabled = false; });
+  }
+}
+// Stato iniziale al caricamento pagina
+(function(){
+  const checked = document.querySelector('input[name="business_unit"]:checked');
+  if (checked) toggleSettoreCard(checked.value);
+})();
+
 // Radio button visual update
 document.querySelectorAll('.radio-opt input[type=radio]').forEach(radio => {
   radio.addEventListener('change', () => {
