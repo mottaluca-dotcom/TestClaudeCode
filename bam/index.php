@@ -366,7 +366,7 @@ if ($p === 'admin' && ($_GET['action'] ?? '') === 'csv_template') {
     header('Content-Disposition: attachment; filename="template_prodotti_alc.csv"');
     $out = fopen('php://output', 'w');
     fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM UTF-8 per Excel
-    fputcsv($out, ['codice','business_unit','tipo','attributo'], ';');
+    fputcsv($out, ['Codice','Business Unit','Tipo','Attributo'], ';');
     fputcsv($out, ['K-502','K System','Macchina','Standard'], ';');
     fputcsv($out, ['KT-100','K Thermo','Accessorio',''], ';');
     fclose($out);
@@ -1519,8 +1519,8 @@ elseif ($p === 'dettaglio' && $app):
     <p style="margin:.25rem 0 .75rem;color:#000;font-size:.875rem">
       Carica un file <code>.csv</code> con separatore <code>;</code> (punto e virgola).<br>
       <strong>La prima riga è sempre considerata intestazione e viene ignorata.</strong><br>
-      Colonne attese in ordine: <code>codice ; business_unit ; tipo ; attributo</code><br>
-      Valori validi per <em>business_unit</em>: <code>K System</code>, <code>K Thermo</code>.<br>
+      Colonne attese in ordine: <code>Codice ; Business Unit ; Tipo ; Attributo</code><br>
+      Valori validi per <em>Business Unit</em>: <code>K System</code>, <code>K Thermo</code>.<br>
       I duplicati (stesso codice + BU) vengono saltati automaticamente.
     </p>
     <form method="POST" action="?p=admin" enctype="multipart/form-data">
