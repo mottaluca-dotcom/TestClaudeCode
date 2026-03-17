@@ -409,7 +409,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .badge-viewer{background:var(--light);color:var(--gray)}
 
 /* ---- FOOTER ---- */
-footer{text-align:center;padding:2rem;font-size:.8rem;color:var(--gray)}
+footer{text-align:center;padding:2rem;font-size:.8rem;color:var(--gray);position:relative}
+#logo-alc{position:fixed;bottom:1.25rem;right:1.25rem;max-height:56px;width:auto;opacity:.85;pointer-events:none}
 footer span{color:var(--red);font-weight:700}
 </style>
 </head>
@@ -729,6 +730,7 @@ $selectedRole = $_GET['role'] ?? 'admin';
 <?php endif; ?>
 
 <footer>&copy; <?= date('Y') ?> <span>ALC</span> — 365° Portale Applicazioni</footer>
+<img id="logo-alc" src="LogoALC.png" alt="ALC">
 
 </body>
 </html>
