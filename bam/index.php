@@ -54,6 +54,18 @@ function db_init(PDO $pdo): void {
         user_id       INTEGER REFERENCES users(id),
         created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS role_app_permissions (
+        ruolo TEXT NOT NULL,
+        app   TEXT NOT NULL,
+        mode  TEXT NOT NULL DEFAULT 'view',
+        PRIMARY KEY (ruolo, app)
+    );
+    CREATE TABLE IF NOT EXISTS bam_section_edit (
+        ruolo    TEXT NOT NULL,
+        sezione  TEXT NOT NULL,
+        can_edit INTEGER DEFAULT 0,
+        PRIMARY KEY (ruolo, sezione)
+    );
     ");
     // Default admin user
     if (!$pdo->query("SELECT id FROM users LIMIT 1")->fetchColumn()) {
@@ -61,6 +73,23 @@ function db_init(PDO $pdo): void {
         $pdo->prepare("INSERT INTO users (email, password, nome, ruolo) VALUES (?, ?, ?, ?)")
             ->execute(['admin@alc.it', $hash, 'Amministratore', 'admin']);
     }
+    // Default app permissions (INSERT OR IGNORE = non sovrascrive personalizzazioni)
+    $ap = $pdo->prepare("INSERT OR IGNORE INTO role_app_permissions (ruolo,app,mode) VALUES(?,?,?)");
+    foreach ([
+        ['admin','bam','edit'],['admin','app1','edit'],['admin','app2','edit'],['admin','app3','edit'],
+        ['responsabile','bam','edit'],['responsabile','app1','edit'],['responsabile','app2','edit'],['responsabile','app3','edit'],
+        ['utente','bam','edit'],
+        ['viewer','bam','view'],
+    ] as $r) $ap->execute($r);
+    // Default BAM section-edit permissions
+    // admin: tutto | responsabile: no note_interne | utente: no note_interne, no media | viewer: niente
+    $sp = $pdo->prepare("INSERT OR IGNORE INTO bam_section_edit (ruolo,sezione,can_edit) VALUES(?,?,?)");
+    foreach ([
+        ['admin','anagrafica',1],['admin','prodotto',1],['admin','note_interne',1],['admin','media',1],
+        ['responsabile','anagrafica',1],['responsabile','prodotto',1],['responsabile','note_interne',0],['responsabile','media',1],
+        ['utente','anagrafica',1],['utente','prodotto',1],['utente','note_interne',0],['utente','media',0],
+        ['viewer','anagrafica',0],['viewer','prodotto',0],['viewer','note_interne',0],['viewer','media',0],
+    ] as $r) $sp->execute($r);
 }
 
 // ============================================================
@@ -71,6 +100,26 @@ function me(): array    { return $_SESSION['user'] ?? []; }
 
 function guard(): void {
     if (!logged()) { redir('login'); }
+}
+
+// Restituisce 'edit' o 'view' per il ruolo corrente su BAM
+function bamMode(): string {
+    $ruolo = me()['ruolo'] ?? 'viewer';
+    if ($ruolo === 'admin') return 'edit';
+    $stmt = db()->prepare("SELECT mode FROM role_app_permissions WHERE ruolo=? AND app='bam'");
+    $stmt->execute([$ruolo]);
+    return $stmt->fetchColumn() ?: 'view';
+}
+
+// Restituisce true se il ruolo corrente può modificare la sezione indicata
+function canEditSection(string $sezione): bool {
+    $ruolo = me()['ruolo'] ?? 'viewer';
+    if ($ruolo === 'admin') return true;
+    if (bamMode() !== 'edit') return false;
+    $stmt = db()->prepare("SELECT can_edit FROM bam_section_edit WHERE ruolo=? AND sezione=?");
+    $stmt->execute([$ruolo, $sezione]);
+    $val = $stmt->fetchColumn();
+    return $val !== false && (bool)$val;
 }
 
 function redir(string $p, string $qs = ''): never {
@@ -205,6 +254,8 @@ if ($p === 'logout') { session_destroy(); redir('login'); }
 
 // Guard
 if (in_array($p, ['welcome','inserimento','database','dettaglio'])) guard();
+// Viewer non può accedere all'inserimento
+if ($p === 'inserimento' && logged() && bamMode() !== 'edit') redir('database');
 
 // Load data for pages
 $app = null;
@@ -350,6 +401,14 @@ button,input,select,textarea{font-family:var(--font)}
   margin-right:.25rem;
 }
 .topbar-user strong{color:#fff}
+.role-badge{font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:20px;letter-spacing:.5px;text-transform:uppercase}
+.role-admin{background:#f0a500;color:#1a1a1a}
+.role-responsabile{background:#2a6dd1;color:#fff}
+.role-utente{background:#1e9e5a;color:#fff}
+.role-viewer{background:#64748b;color:#fff}
+.section-readonly{opacity:.7;border-left:3px solid var(--gray2)!important}
+.section-lock-banner{font-size:.75rem;color:var(--gray);background:var(--light);border-radius:6px;padding:.35rem .7rem;margin-bottom:.75rem}
+.disabled-opt{pointer-events:none;opacity:.6}
 
 /* ============================================================
    LAYOUT
@@ -769,10 +828,14 @@ if (logged()): ?>
   <div class="topbar-user">
     <?= icon('user') ?>
     <strong><?= h(me()['nome'] ?: me()['email']) ?></strong>
+    <span class="role-badge role-<?= h(me()['ruolo'] ?? 'viewer') ?>"><?= h(me()['ruolo'] ?? 'viewer') ?></span>
   </div>
   <div class="topbar-nav">
-    <a href="?p=welcome"     class="<?= $p==='welcome'?'active':'' ?>"><?= icon('home') ?><span class="nav-label">Home</span></a>
+    <a href="../index.php" title="Portale app" style="opacity:.75"><?= icon('home') ?><span class="nav-label">Portale</span></a>
+    <a href="?p=welcome"     class="<?= $p==='welcome'?'active':'' ?>"><?= icon('chart') ?><span class="nav-label">Home</span></a>
+    <?php if (bamMode()==='edit'): ?>
     <a href="?p=inserimento" class="<?= $p==='inserimento'?'active':'' ?>"><?= icon('plus') ?><span class="nav-label">Nuova</span></a>
+    <?php endif; ?>
     <a href="?p=database"    class="<?= $p==='database'?'active':'' ?>"><?= icon('database') ?><span class="nav-label">Database</span></a>
     <a href="?p=logout"><?= icon('logout') ?><span class="nav-label">Esci</span></a>
   </div>
@@ -924,15 +987,17 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
   <form method="POST" action="?p=inserimento" enctype="multipart/form-data">
     <input type="hidden" name="_action" value="salva">
 
-    <!-- BUSINESS UNIT -->
-    <div class="form-card">
+    <!-- SEZIONE ANAGRAFICA -->
+    <?php $canAna = canEditSection('anagrafica'); ?>
+    <div class="form-card <?= !$canAna ? 'section-readonly' : '' ?>">
+      <?php if (!$canAna): ?><div class="section-lock-banner">🔒 Sezione in sola lettura per il tuo ruolo</div><?php endif; ?>
       <div class="form-card-title"><?= icon('tag') ?> Business Unit <span style="color:var(--red);margin-left:.2rem">*</span></div>
       <div class="radio-group">
         <?php foreach (['K-System','K-Termo'] as $bu):
           $checked = ($fd['business_unit'] ?? '') === $bu;
         ?>
-        <label class="radio-opt <?= in_array('business_unit',$fe)?'border-red':'' ?> <?= $checked?'checked':'' ?>">
-          <input type="radio" name="business_unit" value="<?= h($bu) ?>" <?= $checked?'checked':'' ?> required>
+        <label class="radio-opt <?= in_array('business_unit',$fe)?'border-red':'' ?> <?= $checked?'checked':'' ?> <?= !$canAna?'disabled-opt':'' ?>">
+          <input type="radio" name="business_unit" value="<?= h($bu) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required>
           <span class="radio-dot"></span>
           <?= h($bu) ?>
         </label>
@@ -940,15 +1005,14 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
       </div>
     </div>
 
-    <!-- SETTORE -->
-    <div class="form-card">
+    <div class="form-card <?= !$canAna ? 'section-readonly' : '' ?>">
       <div class="form-card-title"><?= icon('filter') ?> Settore <span style="color:var(--red);margin-left:.2rem">*</span></div>
       <div class="radio-group">
         <?php foreach (['Calzatura','Pelletteria','Industria'] as $s):
           $checked = ($fd['settore'] ?? '') === $s;
         ?>
-        <label class="radio-opt gold-check <?= $checked?'checked':'' ?>">
-          <input type="radio" name="settore" value="<?= h($s) ?>" <?= $checked?'checked':'' ?> required>
+        <label class="radio-opt gold-check <?= $checked?'checked':'' ?> <?= !$canAna?'disabled-opt':'' ?>">
+          <input type="radio" name="settore" value="<?= h($s) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required>
           <span class="radio-dot"></span>
           <?= h($s) ?>
         </label>
@@ -956,14 +1020,16 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
       </div>
     </div>
 
-    <!-- DATI PRINCIPALI -->
-    <div class="form-card">
+    <!-- SEZIONE PRODOTTO -->
+    <?php $canProd = canEditSection('prodotto'); ?>
+    <div class="form-card <?= !$canProd ? 'section-readonly' : '' ?>">
+      <?php if (!$canProd): ?><div class="section-lock-banner">🔒 Sezione in sola lettura per il tuo ruolo</div><?php endif; ?>
       <div class="form-card-title"><?= icon('user') ?> Dati Applicazione</div>
 
       <div class="form-row">
         <div class="form-group">
           <label for="regione">Regione <span class="req">*</span></label>
-          <select class="form-control" id="regione" name="regione" required>
+          <select class="form-control" id="regione" name="regione" required <?= !$canAna?'disabled':'' ?>>
             <option value="">— Seleziona —</option>
             <?php foreach ($regions as $r): ?>
             <option value="<?= h($r) ?>" <?= ($fd['regione']??'')===$r?'selected':'' ?>><?= h($r) ?></option>
@@ -973,7 +1039,7 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
         <div class="form-group">
           <label for="cliente">Cliente <span class="req">*</span></label>
           <input class="form-control" type="text" id="cliente" name="cliente"
-                 placeholder="Nome azienda cliente" required
+                 placeholder="Nome azienda cliente" required <?= !$canAna?'disabled':'' ?>
                  value="<?= h($fd['cliente']??'') ?>">
         </div>
       </div>
@@ -981,7 +1047,7 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
       <div class="form-group">
         <label for="prodotto_alc">Prodotto ALC — Codice <span class="req">*</span></label>
         <input class="form-control" type="text" id="prodotto_alc" name="prodotto_alc"
-               placeholder="es. K-502, T-310..." required
+               placeholder="es. K-502, T-310..." required <?= !$canProd?'disabled':'' ?>
                value="<?= h($fd['prodotto_alc']??'') ?>">
       </div>
 
@@ -989,18 +1055,26 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
         <label for="problema">Problema risolto / Applicazione <span class="req">*</span></label>
         <textarea class="form-control" id="problema" name="problema"
                   placeholder="Descrivi il problema risolto, l'applicazione e i benefici ottenuti..."
-                  required rows="4"><?= h($fd['problema']??'') ?></textarea>
-      </div>
-
-      <div class="form-group">
-        <label for="note">Note aggiuntive</label>
-        <textarea class="form-control" id="note" name="note"
-                  placeholder="Eventuali note, parametri tecnici, condizioni particolari..."
-                  rows="2"><?= h($fd['note']??'') ?></textarea>
+                  required <?= !$canProd?'disabled':'' ?> rows="4"><?= h($fd['problema']??'') ?></textarea>
       </div>
     </div>
 
-    <!-- FOTO / VIDEO -->
+    <!-- SEZIONE NOTE INTERNE -->
+    <?php $canNote = canEditSection('note_interne'); ?>
+    <div class="form-card <?= !$canNote ? 'section-readonly' : '' ?>">
+      <?php if (!$canNote): ?><div class="section-lock-banner">🔒 Note interne — accesso riservato</div><?php endif; ?>
+      <div class="form-card-title"><?= icon('eye') ?> Note aggiuntive</div>
+      <div class="form-group">
+        <label for="note">Note <?= $canNote ? '' : '<span style="font-size:.75rem;color:var(--gray)">(sola lettura)</span>' ?></label>
+        <textarea class="form-control" id="note" name="note"
+                  placeholder="<?= $canNote ? 'Eventuali note, parametri tecnici, condizioni particolari...' : 'Non hai i permessi per compilare questo campo.' ?>"
+                  <?= !$canNote?'disabled':'' ?> rows="2"><?= h($fd['note']??'') ?></textarea>
+      </div>
+    </div>
+
+    <!-- SEZIONE MEDIA -->
+    <?php $canMedia = canEditSection('media'); ?>
+    <?php if ($canMedia): ?>
     <div class="form-card">
       <div class="form-card-title"><?= icon('camera') ?> Foto / Video Applicazione</div>
       <div class="upload-area" id="uploadArea">
@@ -1020,6 +1094,7 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
         <p style="font-size:.8rem;color:var(--gray);margin-top:.4rem" id="previewName"></p>
       </div>
     </div>
+    <?php endif; ?>
 
     <div style="display:flex;gap:1rem;flex-wrap:wrap">
       <button type="submit" class="btn btn-gold btn-lg" style="flex:1">
@@ -1197,13 +1272,19 @@ elseif ($p === 'dettaglio' && $app):
 
   <!-- ACTIONS -->
   <hr class="divider">
-  <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
     <a href="?p=database" class="btn btn-outline"><?= icon('back') ?> Torna al database</a>
-    <form method="POST" action="?p=database" onsubmit="return confirm('Sei sicuro di voler eliminare questa applicazione? L\'operazione è irreversibile.')" style="margin-left:auto">
+    <span style="font-size:.75rem;color:var(--gray);margin-left:auto">
+      <?php $ruolo = me()['ruolo'] ?? 'viewer'; ?>
+      Accesso: <strong><?= h($ruolo) ?></strong> — <?= bamMode()==='edit' ? 'modalità modifica' : 'sola lettura' ?>
+    </span>
+    <?php if (in_array($ruolo, ['admin','responsabile'])): ?>
+    <form method="POST" action="?p=database" onsubmit="return confirm('Sei sicuro di voler eliminare questa applicazione? L\'operazione è irreversibile.')">
       <input type="hidden" name="_action" value="elimina">
       <input type="hidden" name="id" value="<?= $app['id'] ?>">
       <button type="submit" class="btn btn-danger btn-sm">🗑 Elimina</button>
     </form>
+    <?php endif; ?>
   </div>
 </div>
 
