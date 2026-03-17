@@ -1090,10 +1090,6 @@ elseif ($p === 'welcome'): ?>
       <div class="stat-num"><?= h($stats['clienti']) ?></div>
       <div class="stat-label">Clienti distinti</div>
     </div>
-    <div class="stat-card navy">
-      <div class="stat-num"><?= h($stats['bu_ksystem']) ?> / <?= h($stats['bu_ktermo']) ?></div>
-      <div class="stat-label">K System / K Thermo</div>
-    </div>
   </div>
 
   <!-- RECENTI -->
