@@ -83,6 +83,9 @@ function db_init(PDO $pdo): void {
     // Migrazione nomi Business Unit (idempotente)
     $pdo->exec("UPDATE applicazioni SET business_unit='K System'  WHERE business_unit='K-System'");
     $pdo->exec("UPDATE applicazioni SET business_unit='K Thermo' WHERE business_unit='K-Termo'");
+    // Normalizza business_unit in prodotti_alc (fix import case-insensitive)
+    $pdo->exec("UPDATE prodotti_alc SET business_unit='K System' WHERE LOWER(business_unit)='k system' AND business_unit!='K System'");
+    $pdo->exec("UPDATE prodotti_alc SET business_unit='K Thermo' WHERE LOWER(business_unit)='k thermo' AND business_unit!='K Thermo'");
     // Utente l.motta (INSERT OR IGNORE — non sovrascrive se già esistente)
     $pdo->prepare("INSERT OR IGNORE INTO users (email, password, nome, ruolo) VALUES (?, ?, ?, ?)")
         ->execute(['l.motta@alcgruppo.com', password_hash('admin', PASSWORD_DEFAULT), 'Luca Motta', 'admin']);
@@ -338,9 +341,10 @@ if ($p === 'admin' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $tip = trim($row[2] ?? '');
                     $att = trim($row[3] ?? '');
                     if (!$cod || !$bu) { $errors++; continue; }
-                    $valid_bus = ['k system', 'k thermo'];
-                    if (!in_array(strtolower($bu), $valid_bus)) { $errors++; continue; }
-                    $ins->execute([$cod, $bu, $tip, $att]);
+                    $bu_map = ['k system' => 'K System', 'k thermo' => 'K Thermo'];
+                    $bu_norm = $bu_map[strtolower($bu)] ?? null;
+                    if (!$bu_norm) { $errors++; continue; }
+                    $ins->execute([$cod, $bu_norm, $tip, $att]);
                     if ($ins->rowCount() > 0) $imported++; else $skipped++;
                 }
                 fclose($handle);
