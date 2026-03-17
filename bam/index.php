@@ -274,13 +274,13 @@ $pageTitle = $pageTitles[$p] ?? 'BAM';
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --navy:   #0d2137;
-  --blue:   #1a4a7a;
-  --blue2:  #2563a8;
+  --blue:   #D12A2F;
+  --blue2:  #D12A2F;
   --gold:   #f0a500;
   --gold2:  #e09200;
   --green:  #1e9e5a;
   --red:    #dc3545;
-  --info:   #0e7abe;
+  --info:   #D12A2F;
   --light:  #f0f4f8;
   --white:  #ffffff;
   --gray:   #64748b;
@@ -382,7 +382,7 @@ button,input,select,textarea{font-family:var(--font)}
 }
 .flash.success{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
 .flash.error  {background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
-.flash.info   {background:#dbeafe;color:#1e40af;border:1px solid #93c5fd}
+.flash.info   {background:#fde8e8;color:#D12A2F;border:1px solid #f5a5a7}
 @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ============================================================
@@ -430,7 +430,7 @@ button,input,select,textarea{font-family:var(--font)}
   background:var(--white);
   transition:var(--trans);
 }
-.form-control:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,168,.12)}
+.form-control:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(209,42,47,.12)}
 .form-control::placeholder{color:var(--gray2)}
 textarea.form-control{resize:vertical;min-height:100px;line-height:1.6}
 select.form-control{cursor:pointer}
@@ -449,7 +449,7 @@ select.form-control{cursor:pointer}
 }
 .btn:hover{transform:translateY(-1px);filter:brightness(1.07)}
 .btn:active{transform:translateY(0);filter:brightness(.97)}
-.btn-primary {background:linear-gradient(135deg,var(--blue2),var(--blue));color:#fff;box-shadow:0 4px 14px rgba(37,99,168,.35)}
+.btn-primary {background:linear-gradient(135deg,var(--blue2),var(--blue));color:#fff;box-shadow:0 4px 14px rgba(209,42,47,.35)}
 .btn-gold    {background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy);box-shadow:0 4px 14px rgba(240,165,0,.3)}
 .btn-outline {background:transparent;border:2px solid var(--blue2);color:var(--blue2)}
 .btn-outline:hover{background:var(--blue2);color:#fff}
@@ -536,7 +536,7 @@ select.form-control{cursor:pointer}
   font-size:.7rem;font-weight:700;letter-spacing:.5px;
   text-transform:uppercase;
 }
-.recent-badge.ks{background:rgba(37,99,168,.12);color:var(--blue2)}
+.recent-badge.ks{background:rgba(209,42,47,.12);color:var(--blue2)}
 .recent-badge.kt{background:rgba(240,165,0,.15);color:var(--gold2)}
 .recent-info{flex:1;min-width:0}
 .recent-info strong{display:block;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -579,7 +579,7 @@ select.form-control{cursor:pointer}
 .radio-opt input{display:none}
 .radio-opt.checked,.radio-opt:has(input:checked){
   border-color:var(--blue2);
-  background:rgba(37,99,168,.08);
+  background:rgba(209,42,47,.08);
   color:var(--blue2);font-weight:600;
 }
 .radio-opt.gold-check.checked,.radio-opt.gold-check:has(input:checked){
@@ -609,7 +609,7 @@ select.form-control{cursor:pointer}
   background:var(--light);
   position:relative;
 }
-.upload-area:hover,.upload-area.drag{border-color:var(--blue2);background:rgba(37,99,168,.04)}
+.upload-area:hover,.upload-area.drag{border-color:var(--blue2);background:rgba(209,42,47,.04)}
 .upload-area input[type=file]{
   position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
 }
@@ -672,7 +672,7 @@ select.form-control{cursor:pointer}
 .db-table thead{background:var(--navy);color:#fff}
 .db-table thead th{padding:.85rem 1rem;text-align:left;font-size:.78rem;font-weight:600;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
 .db-table tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:var(--trans)}
-.db-table tbody tr:hover{background:rgba(37,99,168,.04)}
+.db-table tbody tr:hover{background:rgba(209,42,47,.04)}
 .db-table tbody tr:last-child{border-bottom:none}
 .db-table td{padding:.85rem 1rem;vertical-align:middle}
 .db-table td .ellipsis{max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
@@ -680,7 +680,7 @@ select.form-control{cursor:pointer}
   display:inline-block;padding:.2rem .6rem;border-radius:50px;
   font-size:.72rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;
 }
-.bu-chip.ks{background:rgba(37,99,168,.1);color:var(--blue2)}
+.bu-chip.ks{background:rgba(209,42,47,.1);color:var(--blue2)}
 .bu-chip.kt{background:rgba(240,165,0,.15);color:var(--gold2)}
 .settore-chip{
   display:inline-block;padding:.2rem .6rem;border-radius:50px;
