@@ -66,6 +66,13 @@ function db_init(PDO $pdo): void {
         can_edit INTEGER DEFAULT 0,
         PRIMARY KEY (ruolo, sezione)
     );
+    CREATE TABLE IF NOT EXISTS prodotti_alc (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        codice        TEXT NOT NULL,
+        business_unit TEXT NOT NULL,
+        tipo          TEXT DEFAULT '',
+        attributo     TEXT DEFAULT ''
+    );
     ");
     // Default admin user
     if (!$pdo->query("SELECT id FROM users LIMIT 1")->fetchColumn()) {
@@ -201,6 +208,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errs = [];
         $required = ['business_unit','settore','regione','cliente','problema','prodotto_alc'];
         foreach ($required as $k) if (!$data[$k]) $errs[] = $k;
+        // Codice deve esistere nella tabella prodotti_alc con la BU selezionata
+        if ($data['prodotto_alc'] && $data['business_unit']) {
+            $chk = db()->prepare("SELECT id FROM prodotti_alc WHERE codice=? AND business_unit=?");
+            $chk->execute([$data['prodotto_alc'], $data['business_unit']]);
+            if (!$chk->fetch()) $errs[] = 'prodotto_alc_invalid';
+        }
 
         $media_path = $media_type = null;
         if (!empty($_FILES['media']['name']) && $_FILES['media']['error'] === UPLOAD_ERR_OK) {
@@ -255,11 +268,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// --- API AUTOCOMPLETE ---
+if ($p === 'api') {
+    guard();
+    if (($_GET['action'] ?? '') === 'prodotti') {
+        $bu = $_GET['bu'] ?? '';
+        $q  = '%' . ($_GET['q'] ?? '') . '%';
+        $stmt = db()->prepare(
+            "SELECT codice, tipo, attributo FROM prodotti_alc WHERE business_unit=? AND codice LIKE ? ORDER BY codice LIMIT 40"
+        );
+        $stmt->execute([$bu, $q]);
+        header('Content-Type: application/json');
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+    exit;
+}
+
+// --- ADMIN CRUD PRODOTTI ALC ---
+if ($p === 'admin' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    guard();
+    if ((me()['ruolo'] ?? '') !== 'admin') redir('welcome');
+    $act_a = $_POST['_action'] ?? '';
+    if ($act_a === 'add_prodotto') {
+        $cod = trim($_POST['codice'] ?? '');
+        $bu  = $_POST['business_unit'] ?? '';
+        $tip = trim($_POST['tipo'] ?? '');
+        $att = trim($_POST['attributo'] ?? '');
+        if ($cod && $bu) {
+            db()->prepare("INSERT INTO prodotti_alc (codice,business_unit,tipo,attributo) VALUES (?,?,?,?)")
+               ->execute([$cod, $bu, $tip, $att]);
+        }
+        redir('admin');
+    }
+    if ($act_a === 'edit_prodotto') {
+        $id  = (int)($_POST['id'] ?? 0);
+        $cod = trim($_POST['codice'] ?? '');
+        $bu  = $_POST['business_unit'] ?? '';
+        $tip = trim($_POST['tipo'] ?? '');
+        $att = trim($_POST['attributo'] ?? '');
+        if ($id && $cod && $bu) {
+            db()->prepare("UPDATE prodotti_alc SET codice=?,business_unit=?,tipo=?,attributo=? WHERE id=?")
+               ->execute([$cod, $bu, $tip, $att, $id]);
+        }
+        redir('admin');
+    }
+    if ($act_a === 'del_prodotto') {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id) db()->prepare("DELETE FROM prodotti_alc WHERE id=?")->execute([$id]);
+        redir('admin');
+    }
+}
+
 // --- LOGOUT ---
 if ($p === 'logout') { session_destroy(); redir('login'); }
 
 // Guard
-if (in_array($p, ['welcome','inserimento','database','dettaglio'])) guard();
+if (in_array($p, ['welcome','inserimento','database','dettaglio','admin'])) guard();
+if ($p === 'admin' && logged() && (me()['ruolo'] ?? '') !== 'admin') redir('welcome');
 // Viewer non può accedere all'inserimento
 if ($p === 'inserimento' && logged() && bamMode() !== 'edit') redir('database');
 
@@ -818,6 +883,18 @@ footer span{color:var(--red)}
 /* ============================================================
    UTILITIES
    ============================================================ */
+/* ---- Autocomplete ALC ---- */
+.alc-wrap{position:relative}
+.alc-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--gray2);border-radius:var(--radius2);box-shadow:0 6px 18px rgba(0,0,0,.13);z-index:300;max-height:220px;overflow-y:auto}
+.alc-item{padding:.55rem .9rem;cursor:pointer;display:flex;align-items:center;gap:.6rem;font-size:.9rem;border-bottom:1px solid #f2f2f2}
+.alc-item:last-child{border-bottom:none}
+.alc-item:hover,.alc-item.alc-active{background:var(--light)}
+.alc-item-code{font-weight:600;color:var(--navy);min-width:80px}
+.alc-item-sub{font-size:.78rem;color:var(--gray);margin-left:auto;text-align:right}
+.alc-empty{padding:.7rem .9rem;color:var(--gray);font-size:.85rem;font-style:italic}
+.alc-meta{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.55rem}
+.alc-chip{background:var(--light);border:1px solid var(--border);padding:.3rem .65rem;border-radius:20px;font-size:.82rem;color:var(--navy);display:flex;align-items:center;gap:.35rem}
+.alc-chip strong{font-weight:600;color:var(--gray)}
 .mt1{margin-top:1rem}.mt2{margin-top:1.5rem}.mb1{margin-bottom:1rem}
 .text-gray{color:var(--gray)}
 .page-title{font-size:1.3rem;font-weight:800;color:var(--navy);margin-bottom:1.25rem;display:flex;align-items:center;gap:.6rem}
@@ -845,6 +922,9 @@ if (logged()): ?>
     <a href="?p=inserimento" class="<?= $p==='inserimento'?'active':'' ?>"><?= icon('plus') ?><span class="nav-label">Nuova</span></a>
     <?php endif; ?>
     <a href="?p=database"    class="<?= $p==='database'?'active':'' ?>"><?= icon('database') ?><span class="nav-label">Database</span></a>
+    <?php if ((me()['ruolo'] ?? '') === 'admin'): ?>
+    <a href="?p=admin" class="<?= $p==='admin'?'active':'' ?>"><?= icon('tag') ?><span class="nav-label">Admin</span></a>
+    <?php endif; ?>
     <a href="?p=logout"><?= icon('logout') ?><span class="nav-label">Esci</span></a>
   </div>
 </nav>
@@ -1054,11 +1134,33 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
         </div>
       </div>
 
+      <?php
+        // Pre-carica tipo/attributo se il codice è già valorizzato (es. errore form)
+        $alc_preload = null;
+        if (!empty($fd['prodotto_alc'])) {
+            $stmt_pre = db()->prepare("SELECT tipo, attributo FROM prodotti_alc WHERE codice=? LIMIT 1");
+            $stmt_pre->execute([$fd['prodotto_alc']]);
+            $alc_preload = $stmt_pre->fetch(PDO::FETCH_ASSOC);
+        }
+      ?>
       <div class="form-group">
-        <label for="prodotto_alc">Prodotto ALC — Codice <span class="req">*</span></label>
-        <input class="form-control" type="text" id="prodotto_alc" name="prodotto_alc"
-               placeholder="es. K-502, T-310..." required <?= !$canProd?'disabled':'' ?>
-               value="<?= h($fd['prodotto_alc']??'') ?>">
+        <label for="alc_input">Prodotto ALC — Codice <span class="req">*</span></label>
+        <div class="alc-wrap">
+          <input class="form-control <?= in_array('prodotto_alc',$fe)||in_array('prodotto_alc_invalid',$fe) ? 'border-red' : '' ?>"
+                 type="text" id="alc_input" autocomplete="off"
+                 placeholder="Digita per cercare il codice…"
+                 <?= !$canProd?'disabled':'' ?>
+                 value="<?= h($fd['prodotto_alc']??'') ?>">
+          <input type="hidden" id="prodotto_alc" name="prodotto_alc" value="<?= h($fd['prodotto_alc']??'') ?>">
+          <div class="alc-dropdown" id="alcDropdown" style="display:none"></div>
+        </div>
+        <?php if (in_array('prodotto_alc_invalid',$fe)): ?>
+          <small style="color:var(--red)">Codice non valido per la Business Unit selezionata.</small>
+        <?php endif; ?>
+        <div class="alc-meta" id="alcMeta" style="display:<?= $alc_preload ? 'flex' : 'none' ?>">
+          <span class="alc-chip"><strong>Tipo</strong> <span id="alcTipo"><?= h($alc_preload['tipo'] ?? '—') ?></span></span>
+          <span class="alc-chip"><strong>Attributo</strong> <span id="alcAttributo"><?= h($alc_preload['attributo'] ?? '—') ?></span></span>
+        </div>
       </div>
 
       <div class="form-group">
@@ -1298,6 +1400,104 @@ elseif ($p === 'dettaglio' && $app):
   </div>
 </div>
 
+<?php elseif ($p === 'admin'):
+  $editId  = (int)($_GET['edit'] ?? 0);
+  $editRow = null;
+  if ($editId) {
+      $st = db()->prepare("SELECT * FROM prodotti_alc WHERE id=?");
+      $st->execute([$editId]);
+      $editRow = $st->fetch(PDO::FETCH_ASSOC);
+  }
+  $prodotti = db()->query("SELECT * FROM prodotti_alc ORDER BY business_unit, codice")->fetchAll(PDO::FETCH_ASSOC);
+?>
+<div class="page">
+  <div class="page-title"><?= icon('tag') ?> Admin — Catalogo Prodotti ALC</div>
+
+  <!-- FORM ADD / EDIT -->
+  <div class="form-card">
+    <div class="form-card-title"><?= $editRow ? icon('check').' Modifica Prodotto' : icon('plus').' Aggiungi Prodotto' ?></div>
+    <form method="POST" action="?p=admin">
+      <input type="hidden" name="_action" value="<?= $editRow ? 'edit_prodotto' : 'add_prodotto' ?>">
+      <?php if ($editRow): ?><input type="hidden" name="id" value="<?= $editRow['id'] ?>"><?php endif; ?>
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <div class="form-group">
+          <label>Codice <span class="req">*</span></label>
+          <input class="form-control" name="codice" placeholder="es. K-502" required value="<?= h($editRow['codice'] ?? '') ?>">
+        </div>
+        <div class="form-group">
+          <label>Business Unit <span class="req">*</span></label>
+          <select class="form-control" name="business_unit" required>
+            <option value="">— Seleziona —</option>
+            <?php foreach (['K System','K Thermo'] as $buOpt): ?>
+            <option value="<?= h($buOpt) ?>" <?= ($editRow['business_unit'] ?? '') === $buOpt ? 'selected' : '' ?>><?= h($buOpt) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <input class="form-control" name="tipo" placeholder="es. Macchina" value="<?= h($editRow['tipo'] ?? '') ?>">
+        </div>
+        <div class="form-group">
+          <label>Attributo</label>
+          <input class="form-control" name="attributo" placeholder="es. Standard" value="<?= h($editRow['attributo'] ?? '') ?>">
+        </div>
+      </div>
+      <div style="display:flex;gap:.75rem;margin-top:.25rem">
+        <button type="submit" class="btn btn-primary"><?= $editRow ? 'Salva modifiche' : 'Aggiungi' ?></button>
+        <?php if ($editRow): ?>
+        <a href="?p=admin" class="btn btn-outline">Annulla</a>
+        <?php endif; ?>
+      </div>
+    </form>
+  </div>
+
+  <!-- TABELLA PRODOTTI -->
+  <div class="section-head" style="margin-top:1.5rem">
+    <h2><?= icon('database') ?> Codici presenti</h2>
+    <span class="text-gray"><?= count($prodotti) ?> totali</span>
+  </div>
+
+  <?php if (empty($prodotti)): ?>
+  <div class="empty">
+    <span class="emoji">📋</span>
+    <h3>Nessun prodotto inserito</h3>
+    <p>Aggiungi il primo codice con il form sopra.</p>
+  </div>
+  <?php else: ?>
+  <div class="db-table-wrap">
+    <table class="db-table">
+      <thead>
+        <tr>
+          <th>Codice</th>
+          <th>Business Unit</th>
+          <th>Tipo</th>
+          <th>Attributo</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($prodotti as $prod): ?>
+        <tr>
+          <td><strong><?= h($prod['codice']) ?></strong></td>
+          <td><span class="bu-chip <?= $prod['business_unit']==='K System'?'ks':'kt' ?>"><?= h($prod['business_unit']) ?></span></td>
+          <td><?= h($prod['tipo'] ?: '—') ?></td>
+          <td><?= h($prod['attributo'] ?: '—') ?></td>
+          <td style="white-space:nowrap;text-align:right">
+            <a href="?p=admin&edit=<?= $prod['id'] ?>" class="btn btn-sm btn-outline">Modifica</a>
+            <form method="POST" action="?p=admin" style="display:inline" onsubmit="return confirm('Eliminare il codice <?= h(addslashes($prod['codice'])) ?>?')">
+              <input type="hidden" name="_action" value="del_prodotto">
+              <input type="hidden" name="id" value="<?= $prod['id'] ?>">
+              <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+            </form>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <?php endif; ?>
+</div>
+
 <?php endif; ?>
 
 <footer>
@@ -1348,6 +1548,129 @@ if (ua) {
     previewMedia(input);
   });
 }
+
+// ---- ALC Autocomplete ----
+(function(){
+  const buInputs  = document.querySelectorAll('input[name="business_unit"]');
+  const textInput = document.getElementById('alc_input');
+  const hidden    = document.getElementById('prodotto_alc');
+  const dropdown  = document.getElementById('alcDropdown');
+  const metaDiv   = document.getElementById('alcMeta');
+  const tipoEl    = document.getElementById('alcTipo');
+  const attrEl    = document.getElementById('alcAttributo');
+  if (!textInput) return;
+
+  let timer = null, data = [], activeIdx = -1;
+
+  function getBU() {
+    for (const r of buInputs) if (r.checked) return r.value;
+    return '';
+  }
+
+  function showMeta(tipo, attributo) {
+    tipoEl.textContent  = tipo      || '—';
+    attrEl.textContent  = attributo || '—';
+    metaDiv.style.display = 'flex';
+  }
+
+  function hideMeta() { metaDiv.style.display = 'none'; }
+
+  function render(items) {
+    dropdown.innerHTML = '';
+    activeIdx = -1;
+    if (!items.length) {
+      dropdown.innerHTML = '<div class="alc-empty">Nessun codice trovato</div>';
+      dropdown.style.display = 'block';
+      return;
+    }
+    items.forEach((item, i) => {
+      const d = document.createElement('div');
+      d.className = 'alc-item';
+      const sub = [item.tipo, item.attributo].filter(Boolean).join(' · ');
+      d.innerHTML = `<span class="alc-item-code">${item.codice}</span>${sub ? `<span class="alc-item-sub">${sub}</span>` : ''}`;
+      d.addEventListener('mousedown', e => { e.preventDefault(); pick(item); });
+      dropdown.appendChild(d);
+    });
+    dropdown.style.display = 'block';
+  }
+
+  function pick(item) {
+    textInput.value  = item.codice;
+    hidden.value     = item.codice;
+    dropdown.style.display = 'none';
+    showMeta(item.tipo, item.attributo);
+  }
+
+  function fetch_(q) {
+    const bu = getBU();
+    if (!bu) {
+      dropdown.innerHTML = '<div class="alc-empty">Seleziona prima la Business Unit</div>';
+      dropdown.style.display = 'block';
+      return;
+    }
+    fetch(`?p=api&action=prodotti&bu=${encodeURIComponent(bu)}&q=${encodeURIComponent(q)}`)
+      .then(r => r.json()).then(d => { data = d; render(d); })
+      .catch(() => { dropdown.style.display = 'none'; });
+  }
+
+  // Quando cambia BU, cancella la selezione corrente
+  buInputs.forEach(r => r.addEventListener('change', () => {
+    hidden.value = ''; textInput.value = ''; hideMeta();
+    dropdown.style.display = 'none';
+  }));
+
+  textInput.addEventListener('input', () => {
+    hidden.value = ''; hideMeta();
+    clearTimeout(timer);
+    timer = setTimeout(() => fetch_(textInput.value.trim()), 220);
+  });
+
+  textInput.addEventListener('focus', () => {
+    if (!hidden.value) fetch_(textInput.value.trim());
+  });
+
+  textInput.addEventListener('blur', () => {
+    setTimeout(() => {
+      dropdown.style.display = 'none';
+      // Se il testo non corrisponde a un codice valido, azzera
+      if (textInput.value.trim() && !hidden.value) {
+        const exact = data.find(d => d.codice === textInput.value.trim());
+        if (exact) pick(exact); else textInput.value = '';
+      }
+    }, 180);
+  });
+
+  textInput.addEventListener('keydown', e => {
+    const items = dropdown.querySelectorAll('.alc-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIdx = Math.min(activeIdx + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('alc-active', i === activeIdx));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIdx = Math.max(activeIdx - 1, 0);
+      items.forEach((el, i) => el.classList.toggle('alc-active', i === activeIdx));
+    } else if (e.key === 'Enter' && activeIdx >= 0) {
+      e.preventDefault();
+      if (data[activeIdx]) pick(data[activeIdx]);
+    } else if (e.key === 'Escape') {
+      dropdown.style.display = 'none';
+    }
+  });
+
+  // Pre-popola meta se già valorizzato (es. errore form)
+  if (hidden.value) {
+    const bu = getBU();
+    if (bu) {
+      fetch(`?p=api&action=prodotti&bu=${encodeURIComponent(bu)}&q=${encodeURIComponent(hidden.value)}`)
+        .then(r => r.json()).then(d => {
+          const m = d.find(x => x.codice === hidden.value);
+          if (m) showMeta(m.tipo, m.attributo);
+        });
+    }
+  }
+})();
 
 // Auto-hide flash
 setTimeout(() => {
