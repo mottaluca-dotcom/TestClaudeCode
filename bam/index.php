@@ -266,14 +266,14 @@ $pageTitle = $pageTitles[$p] ?? 'BAM';
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>BAM — <?= h($pageTitle) ?></title>
-<meta name="theme-color" content="#0d2137">
+<meta name="theme-color" content="#D12A2F">
 <style>
 /* ============================================================
    RESET & ROOT
    ============================================================ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --navy:   #0d2137;
+  --navy:   #D12A2F;
   --blue:   #D12A2F;
   --blue2:  #D12A2F;
   --gold:   #f0a500;
@@ -324,12 +324,6 @@ button,input,select,textarea{font-family:var(--font)}
   font-weight:700;
   font-size:1.15rem;
   letter-spacing:.5px;
-}
-.topbar-logo{
-  height:32px;
-  width:auto;
-  object-fit:contain;
-  display:block;
 }
 .topbar-nav{display:flex;align-items:center;gap:.5rem}
 .topbar-nav a,.topbar-nav button{
@@ -387,7 +381,7 @@ button,input,select,textarea{font-family:var(--font)}
 .login-wrap{
   min-height:100vh;
   display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,var(--navy) 0%,#1a3a5c 50%,#1a4a7a 100%);
+  background:linear-gradient(135deg,var(--navy) 0%,#b02428 50%,#8c1c1f 100%);
   padding:1.5rem;
 }
 .login-card{
@@ -771,7 +765,6 @@ if (logged()): ?>
 <nav class="topbar">
   <div class="topbar-brand">
     <span>BAM</span>
-    <img src="logo-alc.png" alt="ALC" class="topbar-logo">
   </div>
   <div class="topbar-user">
     <?= icon('user') ?>
