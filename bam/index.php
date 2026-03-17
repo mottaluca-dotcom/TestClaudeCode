@@ -687,6 +687,12 @@ select.form-control{cursor:pointer}
   gap:1rem;
   margin-bottom:1.5rem;
 }
+@media(max-width:680px){
+  .stats-grid{grid-template-columns:repeat(3,1fr);gap:.5rem}
+  .stat-card{padding:.75rem .4rem}
+  .stat-num{font-size:1.4rem}
+  .stat-label{font-size:.65rem;letter-spacing:.2px}
+}
 .stat-card{
   background:var(--card);
   border-radius:var(--radius);
@@ -899,13 +905,23 @@ select.form-control{cursor:pointer}
 /* Mobile table → cards */
 @media(max-width:680px){
   .db-table thead{display:none}
-  .db-table tbody tr{display:block;border-bottom:none;border-radius:var(--radius2);margin-bottom:.75rem;padding:.75rem 1rem;background:var(--card);box-shadow:var(--shadow)}
+  .db-table tbody tr{display:block;position:relative;border-bottom:none;border-radius:var(--radius2);margin-bottom:.75rem;padding:.75rem 1rem .75rem 1rem;background:var(--card);box-shadow:var(--shadow)}
   .db-table td{display:flex;align-items:center;padding:.3rem 0;border:none}
-  .db-table td::before{content:attr(data-label);font-size:.72rem;font-weight:700;color:var(--gray2);text-transform:uppercase;letter-spacing:.4px;min-width:90px;flex-shrink:0}
+  /* Etichette più larghe */
+  .db-table td::before{content:attr(data-label);font-size:.72rem;font-weight:700;color:var(--gray2);text-transform:uppercase;letter-spacing:.4px;min-width:130px;flex-shrink:0}
   .db-table td .ellipsis{max-width:none}
   .db-table-wrap{background:transparent;box-shadow:none;overflow:visible}
   .db-table{background:transparent}
   .db-table tbody tr:hover{background:var(--card)}
+  /* BU e Settore sulla stessa riga */
+  .db-table td[data-label="BU"]{display:inline-flex;width:auto;margin-right:.5rem}
+  .db-table td[data-label="Settore"]{display:inline-flex;width:auto}
+  .db-table td[data-label="BU"]::before,.db-table td[data-label="Settore"]::before{display:none}
+  /* Eye icon: assoluto verticalmente centrato a destra */
+  .db-table td.action-cell{position:absolute;right:.75rem;top:50%;transform:translateY(-50%);padding:0;width:auto}
+  .db-table td.action-cell::before{display:none}
+  /* Prodotto ALC: padding destra per non sovrapporsi all'icona */
+  .db-table td[data-label="Prodotto ALC"]{padding-right:3rem}
 }
 
 /* ============================================================
