@@ -338,8 +338,8 @@ if ($p === 'admin' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $tip = trim($row[2] ?? '');
                     $att = trim($row[3] ?? '');
                     if (!$cod || !$bu) { $errors++; continue; }
-                    $valid_bus = ['K System', 'K Thermo'];
-                    if (!in_array($bu, $valid_bus)) { $errors++; continue; }
+                    $valid_bus = ['k system', 'k thermo'];
+                    if (!in_array(strtolower($bu), $valid_bus)) { $errors++; continue; }
                     $ins->execute([$cod, $bu, $tip, $att]);
                     if ($ins->rowCount() > 0) $imported++; else $skipped++;
                 }
