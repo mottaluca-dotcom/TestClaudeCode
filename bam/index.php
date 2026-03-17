@@ -411,6 +411,7 @@ if ($p === 'database') {
     $search   = trim($_GET['q']       ?? '');
     $bu_f     = $_GET['bu']           ?? '';
     $settore_f= $_GET['settore']      ?? '';
+    if ($bu_f === 'K Thermo') $settore_f = ''; // Settore esiste solo per K System
     $alc_f    = trim($_GET['alc']     ?? '');
     $sql      = "SELECT a.*, u.nome as inserito_da
                  FROM applicazioni a LEFT JOIN users u ON a.user_id=u.id WHERE 1=1";
@@ -1124,7 +1125,7 @@ elseif ($p === 'welcome'): ?>
       </div>
       <div class="recent-meta">
         <?= date('d/m/y', strtotime($r['created_at'])) ?><br>
-        <?= h($r['ins'] ?: '—') ?>
+        <?php $parts = $r['ins'] ? explode(' ', trim($r['ins'])) : []; echo h($parts ? end($parts) : '—'); ?>
       </div>
     </a>
     <?php endforeach; ?>
@@ -1340,13 +1341,15 @@ elseif ($p === 'database'): ?>
       <label class="filter-radio <?= $bu_f==='K Thermo'?'active':'' ?>">
         <input class="filter-radio-input" type="radio" name="bu" value="K Thermo" <?= $bu_f==='K Thermo'?'checked':'' ?> onchange="this.form.submit()"> K Thermo
       </label>
-      <span class="filter-sep">|</span>
-      <span class="filter-label">Settore:</span>
-      <?php foreach (['Calzatura','Pelletteria','Industria'] as $s): ?>
-      <label class="filter-radio <?= $settore_f===$s?'active':'' ?>">
-        <input class="filter-radio-input" type="radio" name="settore" value="<?= h($s) ?>" <?= $settore_f===$s?'checked':'' ?> onchange="this.form.submit()"> <?= h($s) ?>
-      </label>
-      <?php endforeach; ?>
+      <span class="filter-sep" id="settore-sep" <?= $bu_f==='K Thermo'?'style="display:none"':'' ?>>|</span>
+      <span id="settore-group" <?= $bu_f==='K Thermo'?'style="display:none"':'' ?> style="display:<?= $bu_f==='K Thermo'?'none':'inline-flex' ?>;align-items:center;gap:.35rem;flex-wrap:wrap">
+        <span class="filter-label">Settore:</span>
+        <?php foreach (['Calzatura','Pelletteria','Industria'] as $s): ?>
+        <label class="filter-radio <?= $settore_f===$s?'active':'' ?>">
+          <input class="filter-radio-input" type="radio" name="settore" value="<?= h($s) ?>" <?= $settore_f===$s?'checked':'' ?> onchange="this.form.submit()"> <?= h($s) ?>
+        </label>
+        <?php endforeach; ?>
+      </span>
     </div>
 
     <!-- riga 3: azioni -->
@@ -1882,6 +1885,17 @@ setTimeout(() => {
     setTimeout(() => el.remove(), 500);
   });
 }, 4000);
+
+// Nascondi/mostra Settore in base a BU selezionata
+document.querySelectorAll('input[name="bu"]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const show = this.value !== 'K Thermo';
+    const grp = document.getElementById('settore-group');
+    const sep = document.getElementById('settore-sep');
+    if (grp) grp.style.display = show ? 'inline-flex' : 'none';
+    if (sep) sep.style.display = show ? '' : 'none';
+  });
+});
 </script>
 </body>
 </html>
