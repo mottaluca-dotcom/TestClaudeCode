@@ -17,9 +17,9 @@ define('MAX_FILE_MB', 50);
 // ============================================================
 define('SMTP_HOST',      'smtp.office365.com');
 define('SMTP_PORT',      587);
-define('SMTP_USER',      'tua@email.com');          // <- la tua email Outlook
-define('SMTP_PASS',      'tuapassword');             // <- la tua password
-define('SMTP_FROM',      'tua@email.com');           // <- mittente (uguale all'utente)
+define('SMTP_USER',      'l.motta@alcgruppo.com');
+define('SMTP_PASS',      'Xum86207');
+define('SMTP_FROM',      'l.motta@alcgruppo.com');
 define('SMTP_FROM_NAME', 'BAM – ALC Gruppo');
 
 if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0755, true);
