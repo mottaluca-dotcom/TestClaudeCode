@@ -1018,7 +1018,8 @@ if (logged()): ?>
   </div>
   <div class="topbar-user">
     <?= icon('user') ?>
-    <strong><?= h(me()['nome'] ?: me()['email']) ?></strong>
+    <?php $__n = me()['nome'] ?: me()['email']; $__parts = explode(' ', trim($__n)); ?>
+    <strong><?= h(count($__parts)>1 ? end($__parts) : $__n) ?></strong>
     <span class="role-badge role-<?= h(me()['ruolo'] ?? 'viewer') ?>"><?= h(me()['ruolo'] ?? 'viewer') ?></span>
   </div>
   <div class="topbar-nav">
