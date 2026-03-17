@@ -73,6 +73,9 @@ function db_init(PDO $pdo): void {
         $pdo->prepare("INSERT INTO users (email, password, nome, ruolo) VALUES (?, ?, ?, ?)")
             ->execute(['admin@alc.it', $hash, 'Amministratore', 'admin']);
     }
+    // Migrazione nomi Business Unit (idempotente)
+    $pdo->exec("UPDATE applicazioni SET business_unit='K System'  WHERE business_unit='K-System'");
+    $pdo->exec("UPDATE applicazioni SET business_unit='K Thermo' WHERE business_unit='K-Termo'");
     // Utente l.motta (INSERT OR IGNORE — non sovrascrive se già esistente)
     $pdo->prepare("INSERT OR IGNORE INTO users (email, password, nome, ruolo) VALUES (?, ?, ?, ?)")
         ->execute(['l.motta@alcgruppo.com', password_hash('admin', PASSWORD_DEFAULT), 'Luca Motta', 'admin']);
@@ -296,8 +299,8 @@ if ($p === 'welcome') {
     $stats['totale']       = db()->query("SELECT COUNT(*) FROM applicazioni")->fetchColumn();
     $stats['mese']         = db()->query("SELECT COUNT(*) FROM applicazioni WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now')")->fetchColumn();
     $stats['clienti']      = db()->query("SELECT COUNT(DISTINCT cliente) FROM applicazioni")->fetchColumn();
-    $stats['bu_ksystem']   = db()->query("SELECT COUNT(*) FROM applicazioni WHERE business_unit='K-System'")->fetchColumn();
-    $stats['bu_ktermo']    = db()->query("SELECT COUNT(*) FROM applicazioni WHERE business_unit='K-Termo'")->fetchColumn();
+    $stats['bu_ksystem']   = db()->query("SELECT COUNT(*) FROM applicazioni WHERE business_unit='K System'")->fetchColumn();
+    $stats['bu_ktermo']    = db()->query("SELECT COUNT(*) FROM applicazioni WHERE business_unit='K Thermo'")->fetchColumn();
     $recenti               = db()->query("SELECT a.*,u.nome as ins FROM applicazioni a LEFT JOIN users u ON a.user_id=u.id ORDER BY a.created_at DESC LIMIT 5")->fetchAll();
     if (isset($_GET['saved'])) { $flash = 'Applicazione salvata con successo!'; $flashType='success'; }
 }
@@ -409,6 +412,8 @@ button,input,select,textarea{font-family:var(--font)}
 .role-responsabile{background:#2a6dd1;color:#fff}
 .role-utente{background:#1e9e5a;color:#fff}
 .role-viewer{background:#64748b;color:#fff}
+.form-cards-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:600px){.form-cards-row{grid-template-columns:1fr}}
 .section-readonly{opacity:.7;border-left:3px solid var(--gray2)!important}
 .section-lock-banner{font-size:.75rem;color:var(--gray);background:var(--light);border-radius:6px;padding:.35rem .7rem;margin-bottom:.75rem}
 .disabled-opt{pointer-events:none;opacity:.6}
@@ -560,7 +565,7 @@ select.form-control{cursor:pointer}
 .stat-card.gold{border-top-color:var(--gold)}
 .stat-card.green{border-top-color:var(--green)}
 .stat-card.navy{border-top-color:var(--navy)}
-.stat-num{font-size:2rem;font-weight:800;color:var(--navy);line-height:1}
+.stat-num{font-size:2rem;font-weight:400;color:var(--navy);line-height:1}
 .stat-label{font-size:.75rem;color:var(--gray);margin-top:.3rem;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
 
 .section-head{
@@ -906,7 +911,7 @@ elseif ($p === 'welcome'): ?>
     <h1>Benvenuto in <span>BAM</span></h1>
     <p>Una piattaforma per organizzare e condividere il know-how applicativo<br>al servizio dello sviluppo commerciale.</p>
     <div class="welcome-ctas">
-      <a href="?p=inserimento" class="btn btn-gold btn-lg">
+      <a href="?p=inserimento" class="btn btn-outline btn-lg" style="border-color:rgba(255,255,255,.6);color:#fff;background:rgba(255,255,255,.12)">
         <?= icon('plus') ?> Inserisci Applicazione
       </a>
       <a href="?p=database" class="btn btn-outline btn-lg" style="border-color:rgba(255,255,255,.5);color:#fff">
@@ -931,7 +936,7 @@ elseif ($p === 'welcome'): ?>
     </div>
     <div class="stat-card navy">
       <div class="stat-num"><?= h($stats['bu_ksystem']) ?> / <?= h($stats['bu_ktermo']) ?></div>
-      <div class="stat-label">K-System / K-Termo</div>
+      <div class="stat-label">K System / K Thermo</div>
     </div>
   </div>
 
@@ -950,10 +955,10 @@ elseif ($p === 'welcome'): ?>
   <?php else: ?>
   <div class="recent-list">
     <?php foreach ($recenti as $r):
-      $isBU = $r['business_unit'] === 'K-System' ? 'ks' : 'kt';
+      $isBU = $r['business_unit'] === 'K System' ? 'ks' : 'kt';
     ?>
     <a href="?p=dettaglio&id=<?= $r['id'] ?>" class="recent-item">
-      <div class="recent-badge <?= $isBU ?>"><?= $r['business_unit']==='K-System'?'KS':'KT' ?></div>
+      <div class="recent-badge <?= $isBU ?>"><?= $r['business_unit']==='K System'?'KS':'KT' ?></div>
       <div class="recent-info">
         <strong><?= h($r['cliente']) ?></strong>
         <span><?= h($r['settore']) ?> · <?= h($r['regione']) ?> · <?= h($r['prodotto_alc']) ?></span>
@@ -990,36 +995,38 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
   <form method="POST" action="?p=inserimento" enctype="multipart/form-data">
     <input type="hidden" name="_action" value="salva">
 
-    <!-- SEZIONE ANAGRAFICA -->
+    <!-- SEZIONE ANAGRAFICA: BU + Settore affiancati -->
     <?php $canAna = canEditSection('anagrafica'); ?>
-    <div class="form-card <?= !$canAna ? 'section-readonly' : '' ?>">
-      <?php if (!$canAna): ?><div class="section-lock-banner">🔒 Sezione in sola lettura per il tuo ruolo</div><?php endif; ?>
-      <div class="form-card-title"><?= icon('tag') ?> Business Unit <span style="color:var(--red);margin-left:.2rem">*</span></div>
-      <div class="radio-group">
-        <?php foreach (['K-System','K-Termo'] as $bu):
-          $checked = ($fd['business_unit'] ?? '') === $bu;
-        ?>
-        <label class="radio-opt <?= in_array('business_unit',$fe)?'border-red':'' ?> <?= $checked?'checked':'' ?> <?= !$canAna?'disabled-opt':'' ?>">
-          <input type="radio" name="business_unit" value="<?= h($bu) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required>
-          <span class="radio-dot"></span>
-          <?= h($bu) ?>
-        </label>
-        <?php endforeach; ?>
+    <div class="form-cards-row">
+      <div class="form-card <?= !$canAna ? 'section-readonly' : '' ?>" style="margin-bottom:0">
+        <?php if (!$canAna): ?><div class="section-lock-banner">🔒 Sezione in sola lettura per il tuo ruolo</div><?php endif; ?>
+        <div class="form-card-title"><?= icon('tag') ?> Business Unit <span style="color:var(--red);margin-left:.2rem">*</span></div>
+        <div class="radio-group">
+          <?php foreach (['K System','K Thermo'] as $bu):
+            $checked = ($fd['business_unit'] ?? '') === $bu;
+          ?>
+          <label class="radio-opt <?= in_array('business_unit',$fe)?'border-red':'' ?> <?= $checked?'checked':'' ?> <?= !$canAna?'disabled-opt':'' ?>">
+            <input type="radio" name="business_unit" value="<?= h($bu) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required>
+            <span class="radio-dot"></span>
+            <?= h($bu) ?>
+          </label>
+          <?php endforeach; ?>
+        </div>
       </div>
-    </div>
 
-    <div class="form-card <?= !$canAna ? 'section-readonly' : '' ?>">
-      <div class="form-card-title"><?= icon('filter') ?> Settore <span style="color:var(--red);margin-left:.2rem">*</span></div>
-      <div class="radio-group">
-        <?php foreach (['Calzatura','Pelletteria','Industria'] as $s):
-          $checked = ($fd['settore'] ?? '') === $s;
-        ?>
-        <label class="radio-opt gold-check <?= $checked?'checked':'' ?> <?= !$canAna?'disabled-opt':'' ?>">
-          <input type="radio" name="settore" value="<?= h($s) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required>
-          <span class="radio-dot"></span>
-          <?= h($s) ?>
-        </label>
-        <?php endforeach; ?>
+      <div class="form-card <?= !$canAna ? 'section-readonly' : '' ?>" style="margin-bottom:0">
+        <div class="form-card-title"><?= icon('filter') ?> Settore <span style="color:var(--red);margin-left:.2rem">*</span></div>
+        <div class="radio-group">
+          <?php foreach (['Calzatura','Pelletteria','Industria'] as $s):
+            $checked = ($fd['settore'] ?? '') === $s;
+          ?>
+          <label class="radio-opt gold-check <?= $checked?'checked':'' ?> <?= !$canAna?'disabled-opt':'' ?>">
+            <input type="radio" name="settore" value="<?= h($s) ?>" <?= $checked?'checked':'' ?> <?= !$canAna?'disabled':'' ?> required>
+            <span class="radio-dot"></span>
+            <?= h($s) ?>
+          </label>
+          <?php endforeach; ?>
+        </div>
       </div>
     </div>
 
@@ -1100,7 +1107,7 @@ $regions = ['Lombardia','Veneto','Toscana','Marche','Piemonte','Campania','Emili
     <?php endif; ?>
 
     <div style="display:flex;gap:1rem;flex-wrap:wrap">
-      <button type="submit" class="btn btn-gold btn-lg" style="flex:1">
+      <button type="submit" class="btn btn-primary btn-lg" style="flex:1">
         <?= icon('check') ?> Salva Applicazione
       </button>
       <a href="?p=welcome" class="btn btn-outline" style="padding:.9rem 1.5rem">
@@ -1129,8 +1136,8 @@ elseif ($p === 'database'): ?>
     </div>
     <select name="bu" class="filter-select" onchange="this.form.submit()">
       <option value="">Tutte le BU</option>
-      <option value="K-System" <?= $bu_f==='K-System'?'selected':'' ?>>K-System</option>
-      <option value="K-Termo"  <?= $bu_f==='K-Termo'?'selected':'' ?>>K-Termo</option>
+      <option value="K System"  <?= $bu_f==='K System'?'selected':'' ?>>K System</option>
+      <option value="K Thermo" <?= $bu_f==='K Thermo'?'selected':'' ?>>K Thermo</option>
     </select>
     <select name="settore" class="filter-select" onchange="this.form.submit()">
       <option value="">Tutti i settori</option>
@@ -1168,7 +1175,7 @@ elseif ($p === 'database'): ?>
       </thead>
       <tbody>
         <?php foreach ($apps as $app):
-          $buClass = $app['business_unit']==='K-System'?'ks':'kt';
+          $buClass = $app['business_unit']==='K System'?'ks':'kt';
         ?>
         <tr onclick="location.href='?p=dettaglio&id=<?= $app['id'] ?>'">
           <td data-label="BU">
@@ -1197,7 +1204,7 @@ elseif ($p === 'database'): ?>
 // PAGE: DETTAGLIO
 // ============================================================
 elseif ($p === 'dettaglio' && $app):
-  $buClass = $app['business_unit']==='K-System'?'ks':'kt';
+  $buClass = $app['business_unit']==='K System'?'ks':'kt';
 ?>
 <div class="page">
   <!-- HEADER -->
