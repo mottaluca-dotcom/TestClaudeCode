@@ -228,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // DATA LOADING
 // ============================================================
 $appCatalog = [
-    'bam'  => ['name'=>'BAM',  'full'=>'Bonding Application Management','desc'=>'Gestione e condivisione del know-how applicativo nastri adesivi ALC.','icon'=>'🏭','color'=>'#D12A2F','url'=>'bam/'],
+    'bam'  => ['name'=>'BAM',  'full'=>'Bonding Application Management','desc'=>'Gestione e condivisione del know-how applicativo nastri adesivi ALC.','icon'=>'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="16" fill="rgba(209,42,47,.15)" stroke="#D12A2F" stroke-width="2.5"/><circle cx="18" cy="18" r="7" fill="#fff" stroke="#D12A2F" stroke-width="2"/><circle cx="18" cy="18" r="2.5" fill="#D12A2F"/></svg>','color'=>'#D12A2F','url'=>'bam/'],
     'app1' => ['name'=>'APP1', 'full'=>'Applicazione 1','desc'=>'Descrizione da definire. Applicazione in sviluppo.','icon'=>'📊','color'=>'#2a6dd1','url'=>'app1/'],
     'app2' => ['name'=>'APP2', 'full'=>'Applicazione 2','desc'=>'Descrizione da definire. Applicazione in sviluppo.','icon'=>'🌿','color'=>'#1e9e5a','url'=>'app2/'],
     'app3' => ['name'=>'APP3', 'full'=>'Applicazione 3','desc'=>'Descrizione da definire. Applicazione in sviluppo.','icon'=>'⚙️','color'=>'#f0a500','url'=>'app3/'],
