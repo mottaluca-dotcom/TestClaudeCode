@@ -695,6 +695,9 @@ select.form-control{cursor:pointer}
   .stat-card{padding:.75rem .4rem}
   .stat-num{font-size:1.4rem}
   .stat-label{font-size:.65rem;letter-spacing:.2px}
+  /* Settore: 3 opzioni su una sola riga */
+  #settore-card .radio-group{flex-wrap:nowrap;gap:.35rem}
+  #settore-card .radio-opt{padding:.45rem .65rem;font-size:.78rem}
 }
 .stat-card{
   background:var(--card);
