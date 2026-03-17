@@ -716,10 +716,10 @@ select.form-control{cursor:pointer}
   width:40px;height:40px;border-radius:10px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
   font-size:.7rem;font-weight:700;letter-spacing:.5px;
-  text-transform:uppercase;
+  text-transform:uppercase;border:2px solid;
 }
-.recent-badge.ks{background:rgba(209,42,47,.12);color:var(--blue2)}
-.recent-badge.kt{background:#c87f00;color:#fff}
+.recent-badge.ks{background:#fff;color:#D12A2F;border-color:#D12A2F}
+.recent-badge.kt{background:#fff;color:#2563eb;border-color:#2563eb}
 .recent-info{flex:1;min-width:0}
 .recent-info strong{display:block;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .recent-info span{font-size:.78rem;color:var(--gray)}
@@ -878,8 +878,8 @@ select.form-control{cursor:pointer}
   display:inline-block;padding:.2rem .6rem;border-radius:50px;
   font-size:.72rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;
 }
-.bu-chip.ks{background:rgba(209,42,47,.1);color:var(--blue2)}
-.bu-chip.kt{background:#c87f00;color:#fff}
+.bu-chip.ks{background:#fff;color:#D12A2F;border:2px solid #D12A2F}
+.bu-chip.kt{background:#fff;color:#2563eb;border:2px solid #2563eb}
 .settore-chip{
   display:inline-block;padding:.2rem .6rem;border-radius:50px;
   font-size:.72rem;font-weight:600;
@@ -1370,12 +1370,12 @@ elseif ($p === 'database'): ?>
     <table class="db-table">
       <thead>
         <tr>
-          <th>BU</th>
-          <th>Settore</th>
-          <th>Regione</th>
-          <th>Cliente</th>
-          <th>Prodotto ALC</th>
-          <th></th>
+          <th style="width:60px">BU</th>
+          <th style="width:110px">Settore</th>
+          <th style="width:130px">Regione</th>
+          <th style="width:200px">Cliente</th>
+          <th style="width:180px">Prodotto ALC</th>
+          <th style="width:60px"></th>
         </tr>
       </thead>
       <tbody>
@@ -1384,7 +1384,7 @@ elseif ($p === 'database'): ?>
         ?>
         <tr onclick="location.href='?p=dettaglio&id=<?= $app['id'] ?>'">
           <td data-label="BU">
-            <span class="bu-chip <?= $buClass ?>"><?= h($app['business_unit']) ?></span>
+            <span class="bu-chip <?= $buClass ?>"><?= $app['business_unit']==='K System'?'KS':'KT' ?></span>
           </td>
           <td data-label="Settore">
             <span class="settore-chip"><?= h($app['settore']) ?></span>
@@ -1422,7 +1422,7 @@ elseif ($p === 'dettaglio' && $app):
       <span><?= icon('pin') ?> <?= h($app['regione']) ?></span>
       <span><?= icon('tag') ?> <?= h($app['prodotto_alc']) ?></span>
       <span><?= icon('user') ?> <?= h($app['inserito_da'] ?: $app['user_email']) ?></span>
-      <span>📅 <?= date('d/m/Y H:i', strtotime($app['created_at'])) ?></span>
+      <span>📅 <?= date('d/m/Y', strtotime($app['created_at'])) ?></span>
     </div>
     <div class="detail-actions">
       <a href="?p=database" class="btn btn-outline btn-sm" style="border-color:rgba(255,255,255,.4);color:#fff"><?= icon('back') ?> Torna al database</a>
@@ -1445,11 +1445,11 @@ elseif ($p === 'dettaglio' && $app):
     </div>
     <div class="detail-field">
       <label>Cliente</label>
-      <div class="val"><strong><?= h($app['cliente']) ?></strong></div>
+      <div class="val"><?= h($app['cliente']) ?></div>
     </div>
     <div class="detail-field">
       <label>Prodotto ALC</label>
-      <div class="val"><code style="background:var(--light);padding:.2rem .5rem;border-radius:4px"><?= h($app['prodotto_alc']) ?></code></div>
+      <div class="val"><strong><code style="background:var(--light);padding:.2rem .5rem;border-radius:4px"><?= h($app['prodotto_alc']) ?></code></strong></div>
     </div>
     <div class="detail-field">
       <label>Inserito da</label>
