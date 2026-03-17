@@ -73,6 +73,9 @@ function db_init(PDO $pdo): void {
         $pdo->prepare("INSERT INTO users (email, password, nome, ruolo) VALUES (?, ?, ?, ?)")
             ->execute(['admin@alc.it', $hash, 'Amministratore', 'admin']);
     }
+    // Utente l.motta (INSERT OR IGNORE — non sovrascrive se già esistente)
+    $pdo->prepare("INSERT OR IGNORE INTO users (email, password, nome, ruolo) VALUES (?, ?, ?, ?)")
+        ->execute(['l.motta@alcgruppo.com', password_hash('admin', PASSWORD_DEFAULT), 'Luca Motta', 'admin']);
     // Default app permissions (INSERT OR IGNORE = non sovrascrive personalizzazioni)
     $ap = $pdo->prepare("INSERT OR IGNORE INTO role_app_permissions (ruolo,app,mode) VALUES(?,?,?)");
     foreach ([
@@ -390,7 +393,7 @@ button,input,select,textarea{font-family:var(--font)}
   transition:var(--trans);
 }
 .topbar-nav a:hover,.topbar-nav button:hover{background:rgba(255,255,255,.12);color:#fff}
-.topbar-nav a.active{background:rgba(240,165,0,.15);color:var(--gold)}
+.topbar-nav a.active{background:rgba(255,255,255,.18);color:#fff}
 .topbar-nav .nav-label{display:none}
 @media(min-width:600px){.topbar-nav .nav-label{display:inline}}
 .topbar-user{
@@ -536,7 +539,7 @@ select.form-control{cursor:pointer}
   border-radius:50%;
 }
 .welcome-hero h1{font-size:clamp(1.4rem,4vw,2.1rem);font-weight:800;line-height:1.2;margin-bottom:.6rem}
-.welcome-hero h1 span{color:var(--gold)}
+.welcome-hero h1 span{color:#fff}
 .welcome-hero p{color:rgba(255,255,255,.7);font-size:.95rem;line-height:1.6;max-width:520px}
 .welcome-ctas{display:flex;gap:1rem;margin-top:1.75rem;flex-wrap:wrap}
 
@@ -586,7 +589,7 @@ select.form-control{cursor:pointer}
   text-transform:uppercase;
 }
 .recent-badge.ks{background:rgba(209,42,47,.12);color:var(--blue2)}
-.recent-badge.kt{background:rgba(240,165,0,.15);color:var(--gold2)}
+.recent-badge.kt{background:#c87f00;color:#fff}
 .recent-info{flex:1;min-width:0}
 .recent-info strong{display:block;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .recent-info span{font-size:.78rem;color:var(--gray)}
@@ -632,9 +635,9 @@ select.form-control{cursor:pointer}
   color:var(--blue2);font-weight:600;
 }
 .radio-opt.gold-check.checked,.radio-opt.gold-check:has(input:checked){
-  border-color:var(--gold2);
-  background:rgba(240,165,0,.1);
-  color:var(--gold2);
+  border-color:var(--red);
+  background:rgba(209,42,47,.08);
+  color:var(--red);
 }
 .radio-dot{
   width:10px;height:10px;border-radius:50%;
@@ -730,7 +733,7 @@ select.form-control{cursor:pointer}
   font-size:.72rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;
 }
 .bu-chip.ks{background:rgba(209,42,47,.1);color:var(--blue2)}
-.bu-chip.kt{background:rgba(240,165,0,.15);color:var(--gold2)}
+.bu-chip.kt{background:#c87f00;color:#fff}
 .settore-chip{
   display:inline-block;padding:.2rem .6rem;border-radius:50px;
   font-size:.72rem;font-weight:600;
@@ -805,7 +808,7 @@ footer{
   background:var(--navy);color:rgba(255,255,255,.4);
   text-align:center;padding:.9rem;font-size:.75rem;letter-spacing:.3px;
 }
-footer span{color:var(--gold)}
+footer span{color:var(--red)}
 
 /* ============================================================
    UTILITIES
