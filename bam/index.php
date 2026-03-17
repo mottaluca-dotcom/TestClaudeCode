@@ -12,6 +12,16 @@ define('DB_PATH',    __DIR__ . '/bam.sqlite');
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
 define('MAX_FILE_MB', 50);
 
+// ============================================================
+// SMTP CONFIG — modifica con le tue credenziali Outlook
+// ============================================================
+define('SMTP_HOST',      'smtp.office365.com');
+define('SMTP_PORT',      587);
+define('SMTP_USER',      'tua@email.com');          // <- la tua email Outlook
+define('SMTP_PASS',      'tuapassword');             // <- la tua password
+define('SMTP_FROM',      'tua@email.com');           // <- mittente (uguale all'utente)
+define('SMTP_FROM_NAME', 'BAM – ALC Gruppo');
+
 if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0755, true);
 
 // ============================================================
@@ -72,6 +82,13 @@ function db_init(PDO $pdo): void {
         business_unit TEXT NOT NULL,
         tipo          TEXT DEFAULT '',
         attributo     TEXT DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS password_resets (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token      TEXT NOT NULL UNIQUE,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     ");
     // Default admin user
@@ -143,6 +160,57 @@ function redir(string $p, string $qs = ''): never {
     exit;
 }
 
+// ============================================================
+// SMTP — invio email via Outlook (STARTTLS porta 587)
+// ============================================================
+function smtp_send(string $to, string $subject, string $htmlBody): bool {
+    $fp = @stream_socket_client('tcp://' . SMTP_HOST . ':' . SMTP_PORT, $errno, $errstr, 15);
+    if (!$fp) return false;
+    stream_set_timeout($fp, 15);
+
+    $read = function() use ($fp): string {
+        $out = '';
+        while (($line = fgets($fp, 512)) !== false) {
+            $out .= $line;
+            if (isset($line[3]) && $line[3] === ' ') break;
+        }
+        return $out;
+    };
+    $cmd = function(string $c) use ($fp, $read): string {
+        fwrite($fp, $c . "\r\n");
+        return $read();
+    };
+
+    $read(); // banner
+    $cmd('EHLO localhost');
+    $cmd('STARTTLS');
+    if (!stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT)) {
+        fclose($fp); return false;
+    }
+    $cmd('EHLO localhost');
+    $cmd('AUTH LOGIN');
+    $cmd(base64_encode(SMTP_USER));
+    $r = $cmd(base64_encode(SMTP_PASS));
+    if (strpos($r, '235') === false) { fclose($fp); return false; }
+
+    $cmd('MAIL FROM:<' . SMTP_FROM . '>');
+    $cmd('RCPT TO:<' . $to . '>');
+    $cmd('DATA');
+
+    $msg  = 'From: ' . SMTP_FROM_NAME . ' <' . SMTP_FROM . ">\r\n";
+    $msg .= "To: {$to}\r\n";
+    $msg .= 'Subject: =?UTF-8?B?' . base64_encode($subject) . "?=\r\n";
+    $msg .= "MIME-Version: 1.0\r\n";
+    $msg .= "Content-Type: text/html; charset=UTF-8\r\n";
+    $msg .= "Content-Transfer-Encoding: base64\r\n\r\n";
+    $msg .= chunk_split(base64_encode($htmlBody)) . "\r\n.";
+
+    $r = $cmd($msg);
+    $cmd('QUIT');
+    fclose($fp);
+    return strpos($r, '250') !== false;
+}
+
 function h(mixed $s): string {
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 }
@@ -194,6 +262,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $p         = 'login';
         $flash     = 'Email o password non corretti.';
         $flashType = 'error';
+    }
+
+    // --- FORGOT PASSWORD ---
+    if ($act === 'forgot') {
+        $email = strtolower(trim($_POST['email'] ?? ''));
+        $stmt  = db()->prepare("SELECT id, nome FROM users WHERE LOWER(email)=?");
+        $stmt->execute([$email]);
+        $u = $stmt->fetch();
+        if ($u) {
+            // Cancella token precedenti per questo utente
+            db()->prepare("DELETE FROM password_resets WHERE user_id=?")->execute([$u['id']]);
+            $token   = bin2hex(random_bytes(32));
+            $expires = date('Y-m-d H:i:s', time() + 3600); // 1 ora
+            db()->prepare("INSERT INTO password_resets (user_id,token,expires_at) VALUES (?,?,?)")
+                ->execute([$u['id'], $token, $expires]);
+            $link = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST']
+                  . $_SERVER['PHP_SELF'] . '?p=reset&token=' . $token;
+            $nome = $u['nome'] ?: $email;
+            $html = "
+            <div style='font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:2rem'>
+              <h2 style='color:#D12A2F'>BAM – Reset Password</h2>
+              <p>Ciao <strong>" . htmlspecialchars($nome) . "</strong>,</p>
+              <p>Hai richiesto il reset della password per la piattaforma BAM.<br>
+                 Clicca il pulsante qui sotto per scegliere una nuova password.</p>
+              <p style='text-align:center;margin:2rem 0'>
+                <a href='" . htmlspecialchars($link) . "'
+                   style='background:#D12A2F;color:#fff;padding:.8rem 2rem;border-radius:6px;text-decoration:none;font-weight:bold'>
+                  Reimposta la password
+                </a>
+              </p>
+              <p style='font-size:.85rem;color:#666'>Il link è valido per <strong>1 ora</strong>.<br>
+                 Se non hai richiesto il reset, ignora questa email.</p>
+              <hr style='border:none;border-top:1px solid #eee;margin:2rem 0'>
+              <p style='font-size:.75rem;color:#999'>ALC Gruppo – BAM Platform</p>
+            </div>";
+            smtp_send($email, 'BAM – Reimposta la tua password', $html);
+        }
+        // Sempre messaggio generico (non rivelare se email esiste)
+        $p         = 'forgot';
+        $flash     = 'Se l\'email è registrata, riceverai il link a breve. Controlla anche la cartella spam.';
+        $flashType = 'success';
+    }
+
+    // --- RESET PASSWORD ---
+    if ($act === 'do_reset') {
+        $token = trim($_POST['token'] ?? '');
+        $pw1   = $_POST['pw1'] ?? '';
+        $pw2   = $_POST['pw2'] ?? '';
+        $stmt  = db()->prepare("SELECT r.user_id FROM password_resets r WHERE r.token=? AND r.expires_at > datetime('now')");
+        $stmt->execute([$token]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            $p = 'reset'; $flash = 'Link non valido o scaduto. Richiedi un nuovo reset.'; $flashType = 'error';
+        } elseif (strlen($pw1) < 6) {
+            $p = 'reset'; $flash = 'La password deve essere di almeno 6 caratteri.'; $flashType = 'error';
+        } elseif ($pw1 !== $pw2) {
+            $p = 'reset'; $flash = 'Le password non coincidono.'; $flashType = 'error';
+        } else {
+            db()->prepare("UPDATE users SET password=? WHERE id=?")->execute([password_hash($pw1, PASSWORD_DEFAULT), $row['user_id']]);
+            db()->prepare("DELETE FROM password_resets WHERE token=?")->execute([$token]);
+            $p = 'login'; $flash = 'Password aggiornata! Accedi con le nuove credenziali.'; $flashType = 'success';
+        }
     }
 
     // --- SALVA APPLICAZIONE ---
@@ -446,6 +576,8 @@ if ($p === 'welcome') {
 // ============================================================
 $pageTitles = [
     'login'       => 'Accesso',
+    'forgot'      => 'Password dimenticata',
+    'reset'       => 'Reimposta password',
     'welcome'     => 'Home',
     'inserimento' => 'Nuova Applicazione',
     'database'    => 'Database',
@@ -1079,10 +1211,97 @@ if ($p === 'login'): ?>
       <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem">
         Accedi alla piattaforma
       </button>
+      <p style="text-align:center;margin-top:1rem;margin-bottom:0">
+        <a href="?p=forgot" style="font-size:.82rem;color:#64748b;text-decoration:none">Hai dimenticato la password?</a>
+      </p>
     </form>
     <p style="text-align:center;font-size:.78rem;color:#94a3b8;margin-top:1.5rem">
       Accesso riservato al personale ALC<br>
       <em>Default: admin@alc.it / alc2024</em>
+    </p>
+  </div>
+</div>
+
+<?php
+// ============================================================
+// PAGE: FORGOT PASSWORD
+// ============================================================
+elseif ($p === 'forgot'): ?>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="bam-big">BAM</div>
+      <div class="tagline">Reimposta la password</div>
+    </div>
+    <?php if (!empty($flash)): ?>
+    <div class="flash <?= h($flashType) ?>"><?= h($flash) ?></div>
+    <?php endif; ?>
+    <?php if (empty($flash) || $flashType === 'error'): ?>
+    <form method="POST" action="?p=forgot">
+      <input type="hidden" name="_action" value="forgot">
+      <div class="form-group">
+        <label for="email">La tua email aziendale</label>
+        <input class="form-control" type="email" id="email" name="email"
+               placeholder="nome@alc.it" required
+               value="<?= h($_POST['email'] ?? '') ?>">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem">
+        Invia link di reset
+      </button>
+    </form>
+    <?php endif; ?>
+    <p style="text-align:center;margin-top:1.2rem">
+      <a href="?p=login" style="font-size:.82rem;color:#64748b;text-decoration:none">← Torna al login</a>
+    </p>
+  </div>
+</div>
+
+<?php
+// ============================================================
+// PAGE: RESET PASSWORD
+// ============================================================
+elseif ($p === 'reset'):
+  $resetToken = $_GET['token'] ?? $_POST['token'] ?? '';
+  // Verifica validità token
+  $tokenValid = false;
+  if ($resetToken) {
+      $chk = db()->prepare("SELECT id FROM password_resets WHERE token=? AND expires_at > datetime('now')");
+      $chk->execute([$resetToken]);
+      $tokenValid = (bool)$chk->fetch();
+  }
+?>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="bam-big">BAM</div>
+      <div class="tagline">Nuova password</div>
+    </div>
+    <?php if (!empty($flash)): ?>
+    <div class="flash <?= h($flashType) ?>"><?= h($flash) ?></div>
+    <?php endif; ?>
+    <?php if ($tokenValid): ?>
+    <form method="POST" action="?p=reset">
+      <input type="hidden" name="_action" value="do_reset">
+      <input type="hidden" name="token" value="<?= h($resetToken) ?>">
+      <div class="form-group">
+        <label for="pw1">Nuova password</label>
+        <input class="form-control" type="password" id="pw1" name="pw1" placeholder="Minimo 6 caratteri" required minlength="6">
+      </div>
+      <div class="form-group">
+        <label for="pw2">Conferma password</label>
+        <input class="form-control" type="password" id="pw2" name="pw2" placeholder="Ripeti la password" required minlength="6">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem">
+        Salva nuova password
+      </button>
+    </form>
+    <?php elseif (empty($flash)): ?>
+    <div class="flash error">Link non valido o scaduto. Richiedi un nuovo reset.</div>
+    <?php endif; ?>
+    <p style="text-align:center;margin-top:1.2rem">
+      <a href="?p=<?= $tokenValid ? 'login' : 'forgot' ?>" style="font-size:.82rem;color:#64748b;text-decoration:none">
+        <?= $tokenValid ? '← Torna al login' : '← Richiedi nuovo link' ?>
+      </a>
     </p>
   </div>
 </div>
