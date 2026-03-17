@@ -317,6 +317,60 @@ if ($p === 'admin' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id) db()->prepare("DELETE FROM prodotti_alc WHERE id=?")->execute([$id]);
         redir('admin');
     }
+    if ($act_a === 'import_csv') {
+        $file = $_FILES['csv_file'] ?? null;
+        $imported = 0; $skipped = 0; $errors = 0;
+        if ($file && $file['error'] === UPLOAD_ERR_OK) {
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, ['csv', 'txt'])) {
+                $handle = fopen($file['tmp_name'], 'r');
+                $firstRow = true;
+                $ins = db()->prepare("INSERT OR IGNORE INTO prodotti_alc (codice,business_unit,tipo,attributo) VALUES (?,?,?,?)");
+                while (($row = fgetcsv($handle, 1000, ';')) !== false) {
+                    // Prova anche separatore virgola se punto e virgola non funziona
+                    if (count($row) < 2 && strpos($row[0] ?? '', ',') !== false) {
+                        $row = str_getcsv($row[0], ',');
+                    }
+                    // Salta sempre la prima riga (intestazione)
+                    if ($firstRow) { $firstRow = false; continue; }
+                    $cod = trim($row[0] ?? '');
+                    $bu  = trim($row[1] ?? '');
+                    $tip = trim($row[2] ?? '');
+                    $att = trim($row[3] ?? '');
+                    if (!$cod || !$bu) { $errors++; continue; }
+                    $valid_bus = ['K System', 'K Thermo'];
+                    if (!in_array($bu, $valid_bus)) { $errors++; continue; }
+                    $ins->execute([$cod, $bu, $tip, $att]);
+                    if ($ins->rowCount() > 0) $imported++; else $skipped++;
+                }
+                fclose($handle);
+                $_SESSION['csv_flash'] = "Import completato: <strong>$imported</strong> importati, <strong>$skipped</strong> già presenti, <strong>$errors</strong> righe non valide.";
+                $_SESSION['csv_flash_type'] = ($errors > 0 && $imported === 0) ? 'error' : 'success';
+            } else {
+                $_SESSION['csv_flash'] = 'Formato non supportato. Carica un file .csv';
+                $_SESSION['csv_flash_type'] = 'error';
+            }
+        } else {
+            $_SESSION['csv_flash'] = 'Errore nel caricamento del file.';
+            $_SESSION['csv_flash_type'] = 'error';
+        }
+        redir('admin');
+    }
+}
+
+// --- DOWNLOAD TEMPLATE CSV ---
+if ($p === 'admin' && ($_GET['action'] ?? '') === 'csv_template') {
+    guard();
+    if ((me()['ruolo'] ?? '') !== 'admin') redir('welcome');
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="template_prodotti_alc.csv"');
+    $out = fopen('php://output', 'w');
+    fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM UTF-8 per Excel
+    fputcsv($out, ['codice','business_unit','tipo','attributo'], ';');
+    fputcsv($out, ['K-502','K System','Macchina','Standard'], ';');
+    fputcsv($out, ['KT-100','K Thermo','Accessorio',''], ';');
+    fclose($out);
+    exit;
 }
 
 // --- LOGOUT ---
@@ -1411,7 +1465,7 @@ elseif ($p === 'dettaglio' && $app):
   $prodotti = db()->query("SELECT * FROM prodotti_alc ORDER BY business_unit, codice")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <div class="page">
-  <div class="page-title"><?= icon('tag') ?> Admin — Catalogo Prodotti ALC</div>
+  <div class="page-title"><?= icon('tag') ?> Catalogo Prodotti</div>
 
   <!-- FORM ADD / EDIT -->
   <div class="form-card">
@@ -1447,6 +1501,35 @@ elseif ($p === 'dettaglio' && $app):
         <?php if ($editRow): ?>
         <a href="?p=admin" class="btn btn-outline">Annulla</a>
         <?php endif; ?>
+      </div>
+    </form>
+  </div>
+
+  <!-- IMPORT CSV -->
+  <?php
+    $csvFlash = $_SESSION['csv_flash'] ?? '';
+    $csvFlashType = $_SESSION['csv_flash_type'] ?? 'success';
+    unset($_SESSION['csv_flash'], $_SESSION['csv_flash_type']);
+  ?>
+  <?php if ($csvFlash): ?>
+  <div class="flash flash-<?= h($csvFlashType) ?>" style="margin-top:1rem"><?= $csvFlash ?></div>
+  <?php endif; ?>
+  <div class="form-card" style="margin-top:1.5rem">
+    <div class="form-card-title"><?= icon('database') ?> Importazione massiva da CSV</div>
+    <p style="margin:.25rem 0 .75rem;color:var(--text-muted);font-size:.875rem">
+      Carica un file <code>.csv</code> con separatore <code>;</code> (punto e virgola).<br>
+      <strong>La prima riga è sempre considerata intestazione e viene ignorata.</strong><br>
+      Colonne attese in ordine: <code>codice ; business_unit ; tipo ; attributo</code><br>
+      Valori validi per <em>business_unit</em>: <code>K System</code>, <code>K Thermo</code>.<br>
+      I duplicati (stesso codice + BU) vengono saltati automaticamente.
+    </p>
+    <form method="POST" action="?p=admin" enctype="multipart/form-data">
+      <input type="hidden" name="_action" value="import_csv">
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+        <input type="file" name="csv_file" accept=".csv,.txt" required
+               style="flex:1;min-width:0;padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">
+        <button type="submit" class="btn btn-primary">Importa</button>
+        <a href="?p=admin&action=csv_template" class="btn btn-outline" title="Scarica un file CSV di esempio già compilato">⬇ Template CSV</a>
       </div>
     </form>
   </div>
