@@ -977,7 +977,7 @@ if (logged()): ?>
     <?php endif; ?>
     <a href="?p=database"    class="<?= $p==='database'?'active':'' ?>"><?= icon('database') ?><span class="nav-label">Database</span></a>
     <?php if ((me()['ruolo'] ?? '') === 'admin'): ?>
-    <a href="?p=admin" class="<?= $p==='admin'?'active':'' ?>"><?= icon('tag') ?><span class="nav-label">Admin</span></a>
+    <a href="?p=admin" class="<?= $p==='admin'?'active':'' ?>"><?= icon('tag') ?><span class="nav-label">Catalogo Prodotti</span></a>
     <?php endif; ?>
     <a href="?p=logout"><?= icon('logout') ?><span class="nav-label">Esci</span></a>
   </div>
@@ -1516,7 +1516,7 @@ elseif ($p === 'dettaglio' && $app):
   <?php endif; ?>
   <div class="form-card" style="margin-top:1.5rem">
     <div class="form-card-title"><?= icon('database') ?> Importazione massiva da CSV</div>
-    <p style="margin:.25rem 0 .75rem;color:var(--text-muted);font-size:.875rem">
+    <p style="margin:.25rem 0 .75rem;color:#000;font-size:.875rem">
       Carica un file <code>.csv</code> con separatore <code>;</code> (punto e virgola).<br>
       <strong>La prima riga è sempre considerata intestazione e viene ignorata.</strong><br>
       Colonne attese in ordine: <code>codice ; business_unit ; tipo ; attributo</code><br>
