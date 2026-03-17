@@ -1529,7 +1529,6 @@ elseif ($p === 'dettaglio' && $app):
         <input type="file" name="csv_file" accept=".csv,.txt" required
                style="flex:1;min-width:0;padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">
         <button type="submit" class="btn btn-primary">Importa</button>
-        <a href="?p=admin&action=csv_template" class="btn btn-outline" title="Scarica un file CSV di esempio già compilato">⬇ Template CSV</a>
       </div>
     </form>
   </div>
