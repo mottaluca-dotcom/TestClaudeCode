@@ -277,10 +277,17 @@ if ($p === 'api') {
     if (($_GET['action'] ?? '') === 'prodotti') {
         $bu = $_GET['bu'] ?? '';
         $q  = '%' . ($_GET['q'] ?? '') . '%';
-        $stmt = db()->prepare(
-            "SELECT codice, tipo, attributo FROM prodotti_alc WHERE business_unit=? AND codice LIKE ? ORDER BY codice LIMIT 40"
-        );
-        $stmt->execute([$bu, $q]);
+        if ($bu !== '') {
+            $stmt = db()->prepare(
+                "SELECT codice, tipo, attributo FROM prodotti_alc WHERE business_unit=? AND codice LIKE ? ORDER BY codice LIMIT 40"
+            );
+            $stmt->execute([$bu, $q]);
+        } else {
+            $stmt = db()->prepare(
+                "SELECT codice, tipo, attributo FROM prodotti_alc WHERE codice LIKE ? ORDER BY codice LIMIT 40"
+            );
+            $stmt->execute([$q]);
+        }
         header('Content-Type: application/json');
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
@@ -1327,23 +1334,17 @@ elseif ($p === 'database'): ?>
     <!-- riga 2: radio BU -->
     <div class="db-filters-row db-filters-radios">
       <span class="filter-label">BU:</span>
-      <label class="filter-radio <?= $bu_f===''?'active':'' ?>">
-        <input type="radio" name="bu" value="" <?= $bu_f===''?'checked':'' ?> onchange="this.form.submit()"> Tutte
-      </label>
       <label class="filter-radio <?= $bu_f==='K System'?'active':'' ?>">
-        <input type="radio" name="bu" value="K System" <?= $bu_f==='K System'?'checked':'' ?> onchange="this.form.submit()"> K System
+        <input class="filter-radio-input" type="radio" name="bu" value="K System" <?= $bu_f==='K System'?'checked':'' ?> onchange="this.form.submit()"> K System
       </label>
       <label class="filter-radio <?= $bu_f==='K Thermo'?'active':'' ?>">
-        <input type="radio" name="bu" value="K Thermo" <?= $bu_f==='K Thermo'?'checked':'' ?> onchange="this.form.submit()"> K Thermo
+        <input class="filter-radio-input" type="radio" name="bu" value="K Thermo" <?= $bu_f==='K Thermo'?'checked':'' ?> onchange="this.form.submit()"> K Thermo
       </label>
       <span class="filter-sep">|</span>
       <span class="filter-label">Settore:</span>
-      <label class="filter-radio <?= $settore_f===''?'active':'' ?>">
-        <input type="radio" name="settore" value="" <?= $settore_f===''?'checked':'' ?> onchange="this.form.submit()"> Tutti
-      </label>
       <?php foreach (['Calzatura','Pelletteria','Industria'] as $s): ?>
       <label class="filter-radio <?= $settore_f===$s?'active':'' ?>">
-        <input type="radio" name="settore" value="<?= h($s) ?>" <?= $settore_f===$s?'checked':'' ?> onchange="this.form.submit()"> <?= h($s) ?>
+        <input class="filter-radio-input" type="radio" name="settore" value="<?= h($s) ?>" <?= $settore_f===$s?'checked':'' ?> onchange="this.form.submit()"> <?= h($s) ?>
       </label>
       <?php endforeach; ?>
     </div>
@@ -1858,6 +1859,19 @@ if (ua) {
         if (exact) { hid.value = exact.codice; } else { inp.value = hid.value = ''; }
       }
     }, 180);
+  });
+})();
+
+// ---- Deselect filter radios on second click ----
+(function(){
+  document.querySelectorAll('.filter-radio-input').forEach(function(radio){
+    radio.addEventListener('mousedown', function(){ this._wasChecked = this.checked; });
+    radio.addEventListener('click', function(){
+      if (this._wasChecked) {
+        this.checked = false;
+        this.form.submit();
+      }
+    });
   });
 })();
 
