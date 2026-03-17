@@ -18,8 +18,84 @@ function portalDb(): PDO {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
+        portal_db_init($pdo);
     }
     return $pdo;
+}
+
+function portal_db_init(PDO $pdo): void {
+    $pdo->exec("
+    CREATE TABLE IF NOT EXISTS users (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        email      TEXT UNIQUE NOT NULL,
+        password   TEXT NOT NULL,
+        nome       TEXT DEFAULT '',
+        ruolo      TEXT DEFAULT 'user',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS applicazioni (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_unit TEXT NOT NULL,
+        settore       TEXT NOT NULL,
+        regione       TEXT NOT NULL,
+        cliente       TEXT NOT NULL,
+        problema      TEXT NOT NULL,
+        prodotto_alc  TEXT NOT NULL,
+        note          TEXT DEFAULT '',
+        media_path    TEXT,
+        media_type    TEXT,
+        user_id       INTEGER REFERENCES users(id),
+        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS role_app_permissions (
+        ruolo TEXT NOT NULL,
+        app   TEXT NOT NULL,
+        mode  TEXT NOT NULL DEFAULT 'view',
+        PRIMARY KEY (ruolo, app)
+    );
+    CREATE TABLE IF NOT EXISTS bam_section_edit (
+        ruolo    TEXT NOT NULL,
+        sezione  TEXT NOT NULL,
+        can_edit INTEGER DEFAULT 0,
+        PRIMARY KEY (ruolo, sezione)
+    );
+    CREATE TABLE IF NOT EXISTS prodotti_alc (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        codice        TEXT NOT NULL,
+        business_unit TEXT NOT NULL,
+        tipo          TEXT DEFAULT '',
+        attributo     TEXT DEFAULT ''
+    );
+    ");
+    // Utenti di default
+    $existing = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+    if ($existing == 0) {
+        $users = [
+            ['admin@alc.it',          password_hash('alc2024', PASSWORD_DEFAULT), 'Admin',    'admin'],
+            ['l.motta@alcgruppo.com',  password_hash('admin',   PASSWORD_DEFAULT), 'L. Motta', 'admin'],
+        ];
+        $ins = $pdo->prepare("INSERT OR IGNORE INTO users (email,password,nome,ruolo) VALUES (?,?,?,?)");
+        foreach ($users as $u) $ins->execute($u);
+
+        // Permessi di default
+        $perms = [
+            ['admin','bam','edit'],
+            ['responsabile','bam','edit'],
+            ['utente','bam','edit'],
+            ['viewer','bam','view'],
+        ];
+        $insP = $pdo->prepare("INSERT OR IGNORE INTO role_app_permissions (ruolo,app,mode) VALUES (?,?,?)");
+        foreach ($perms as $pr) $insP->execute($pr);
+
+        // Sezioni editabili
+        $sections = [
+            ['admin','anagrafica',1],['admin','prodotto',1],['admin','note_interne',1],['admin','media',1],
+            ['responsabile','anagrafica',1],['responsabile','prodotto',1],['responsabile','media',1],
+            ['utente','anagrafica',1],['utente','prodotto',1],
+        ];
+        $insS = $pdo->prepare("INSERT OR IGNORE INTO bam_section_edit (ruolo,sezione,can_edit) VALUES (?,?,?)");
+        foreach ($sections as $s) $insS->execute($s);
+    }
 }
 
 // ============================================================
