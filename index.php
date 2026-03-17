@@ -306,7 +306,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .hero{background:linear-gradient(135deg,var(--red) 0%,#8c1c1f 100%);
   color:#fff;text-align:center;padding:3rem 1.5rem 4.5rem}
 .hero h1{font-size:clamp(1.8rem,5vw,3rem);font-weight:900;letter-spacing:-1px;margin-bottom:.4rem}
-.hero h1 span{color:#fff;opacity:.9;font-style:italic}
+.hero h1 span{color:#fff;opacity:.9}
 .hero p{font-size:.95rem;opacity:.85;max-width:480px;margin:0 auto}
 
 /* ---- LOGIN ---- */
@@ -417,7 +417,7 @@ footer span{color:var(--red);font-weight:700}
 
 <!-- ===== TOPBAR ===== -->
 <nav class="topbar">
-  <div class="topbar-brand">ALC <span>365°</span></div>
+  <div class="topbar-brand"></div>
   <?php if (logged()): ?>
   <div class="topbar-user">
     <strong><?= h(me()['nome'] ?: me()['email']) ?></strong>
