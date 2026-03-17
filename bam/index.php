@@ -325,15 +325,11 @@ button,input,select,textarea{font-family:var(--font)}
   font-size:1.15rem;
   letter-spacing:.5px;
 }
-.topbar-brand .badge{
-  background:var(--gold);
-  color:var(--navy);
-  font-size:.6rem;
-  font-weight:800;
-  letter-spacing:1px;
-  padding:.2rem .45rem;
-  border-radius:4px;
-  text-transform:uppercase;
+.topbar-logo{
+  height:32px;
+  width:auto;
+  object-fit:contain;
+  display:block;
 }
 .topbar-nav{display:flex;align-items:center;gap:.5rem}
 .topbar-nav a,.topbar-nav button{
@@ -775,7 +771,7 @@ if (logged()): ?>
 <nav class="topbar">
   <div class="topbar-brand">
     <span>BAM</span>
-    <span class="badge">ALC</span>
+    <img src="logo-alc.png" alt="ALC" class="topbar-logo">
   </div>
   <div class="topbar-user">
     <?= icon('user') ?>
@@ -1095,8 +1091,6 @@ elseif ($p === 'database'): ?>
           <th>Regione</th>
           <th>Cliente</th>
           <th>Prodotto ALC</th>
-          <th>Applicazione</th>
-          <th>Media</th>
           <th>Data</th>
           <th></th>
         </tr>
@@ -1113,14 +1107,8 @@ elseif ($p === 'database'): ?>
             <span class="settore-chip"><?= h($app['settore']) ?></span>
           </td>
           <td data-label="Regione"><?= h($app['regione']) ?></td>
-          <td data-label="Cliente"><strong><?= h($app['cliente']) ?></strong></td>
-          <td data-label="Prodotto ALC"><code style="background:var(--light);padding:.15rem .4rem;border-radius:4px;font-size:.8rem"><?= h($app['prodotto_alc']) ?></code></td>
-          <td data-label="Applicazione"><span class="ellipsis"><?= h($app['problema']) ?></span></td>
-          <td data-label="Media">
-            <?php if ($app['media_path']): ?>
-              <?= $app['media_type']==='video' ? '🎥' : '📸' ?>
-            <?php else: echo '—'; endif; ?>
-          </td>
+          <td data-label="Cliente"><?= h($app['cliente']) ?></td>
+          <td data-label="Prodotto ALC"><strong><?= h($app['prodotto_alc']) ?></strong></td>
           <td data-label="Data" class="text-gray"><?= date('d/m/Y', strtotime($app['created_at'])) ?></td>
           <td class="action-cell">
             <a href="?p=dettaglio&id=<?= $app['id'] ?>" class="btn btn-sm btn-outline" onclick="event.stopPropagation()"><?= icon('eye') ?></a>
@@ -1159,23 +1147,6 @@ elseif ($p === 'dettaglio' && $app):
     </div>
   </div>
 
-  <!-- MEDIA -->
-  <?php if ($app['media_path']): ?>
-  <div class="detail-media">
-    <h3><?= $app['media_type']==='video' ? '🎥 Video applicazione' : '📸 Foto applicazione' ?></h3>
-    <div class="media-container">
-      <?php if ($app['media_type'] === 'image'): ?>
-        <img src="<?= h($app['media_path']) ?>" alt="Foto applicazione" loading="lazy">
-      <?php else: ?>
-        <video controls preload="metadata">
-          <source src="<?= h($app['media_path']) ?>">
-          Il tuo browser non supporta la riproduzione video.
-        </video>
-      <?php endif; ?>
-    </div>
-  </div>
-  <?php endif; ?>
-
   <!-- CAMPI -->
   <div class="detail-grid">
     <div class="detail-field">
@@ -1213,6 +1184,23 @@ elseif ($p === 'dettaglio' && $app):
     </div>
     <?php endif; ?>
   </div>
+
+  <!-- MEDIA -->
+  <?php if ($app['media_path']): ?>
+  <div class="detail-media" style="margin-top:1.5rem">
+    <h3><?= $app['media_type']==='video' ? '🎥 Video applicazione' : '📸 Foto applicazione' ?></h3>
+    <div class="media-container">
+      <?php if ($app['media_type'] === 'image'): ?>
+        <img src="<?= h($app['media_path']) ?>" alt="Foto applicazione" loading="lazy">
+      <?php else: ?>
+        <video controls preload="metadata">
+          <source src="<?= h($app['media_path']) ?>">
+          Il tuo browser non supporta la riproduzione video.
+        </video>
+      <?php endif; ?>
+    </div>
+  </div>
+  <?php endif; ?>
 
   <!-- ACTIONS -->
   <hr class="divider">
