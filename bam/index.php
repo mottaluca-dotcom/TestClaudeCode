@@ -567,7 +567,7 @@ if ($p === 'database') {
     if ($search)    { $sql .= " AND (a.cliente LIKE ? OR a.prodotto_alc LIKE ? OR a.problema LIKE ? OR a.regione LIKE ?)"; $params = array_merge($params, ["%$search%","%$search%","%$search%","%$search%"]); }
     if ($bu_f)      { $sql .= " AND a.business_unit=?"; $params[] = $bu_f; }
     if ($settore_f) { $sql .= " AND a.settore=?";       $params[] = $settore_f; }
-    if ($alc_f)     { $sql .= " AND a.prodotto_alc=?";  $params[] = $alc_f; }
+    if ($alc_f)     { $sql .= " AND a.prodotto_alc LIKE ?"; $params[] = "%$alc_f%"; }
     $sql .= " ORDER BY a.created_at DESC";
     $stmt = db()->prepare($sql); $stmt->execute($params);
     $apps = $stmt->fetchAll();
@@ -746,7 +746,7 @@ button,input,select,textarea{font-family:var(--font)}
   margin-bottom:2rem;
 }
 .login-logo .bam-big{
-  font-size:3rem;font-weight:900;letter-spacing:2px;
+  font-size:6rem;font-weight:900;letter-spacing:2px;
   background:linear-gradient(135deg,var(--navy),var(--blue2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   background-clip:text;
@@ -1591,7 +1591,7 @@ elseif ($p === 'database'): ?>
 
     <!-- riga 2: radio BU -->
     <div class="db-filters-row db-filters-radios">
-      <span class="filter-label">BU:</span>
+      <span class="filter-label">BU</span>
       <label class="filter-radio <?= $bu_f==='K System'?'active':'' ?>">
         <input class="filter-radio-input" type="radio" name="bu" value="K System" <?= $bu_f==='K System'?'checked':'' ?> onchange="this.form.submit()"> K System
       </label>
@@ -1600,7 +1600,7 @@ elseif ($p === 'database'): ?>
       </label>
       <span class="filter-sep" id="settore-sep" <?= $bu_f==='K Thermo'?'style="display:none"':'' ?>>|</span>
       <span id="settore-group" <?= $bu_f==='K Thermo'?'style="display:none"':'' ?> style="display:<?= $bu_f==='K Thermo'?'none':'inline-flex' ?>;align-items:center;gap:.35rem;flex-wrap:wrap">
-        <span class="filter-label">Settore:</span>
+        <span class="filter-label">Settore</span>
         <?php foreach (['Calzatura','Pelletteria','Industria'] as $s): ?>
         <label class="filter-radio <?= $settore_f===$s?'active':'' ?>">
           <input class="filter-radio-input" type="radio" name="settore" value="<?= h($s) ?>" <?= $settore_f===$s?'checked':'' ?> onchange="this.form.submit()"> <?= h($s) ?>
@@ -2134,9 +2134,17 @@ if (ua) {
       drop.style.display = 'none';
       if (inp.value.trim() && !hid.value) {
         const exact = data.find(d => d.codice === inp.value.trim());
-        if (exact) { hid.value = exact.codice; } else { inp.value = hid.value = ''; }
+        if (exact) { hid.value = exact.codice; }
+        // se non c'è corrispondenza esatta, mantieni il testo per LIKE search
+        else { hid.value = inp.value.trim(); }
       }
     }, 180);
+  });
+
+  document.getElementById('dbFiltersForm').addEventListener('submit', function() {
+    if (inp.value.trim() && !hid.value) {
+      hid.value = inp.value.trim();
+    }
   });
 })();
 
