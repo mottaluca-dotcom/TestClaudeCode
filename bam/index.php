@@ -8,10 +8,10 @@ session_start();
 // ============================================================
 // CONFIG
 // ============================================================
-define('DB_HOST', 'localhost');
+define('DB_HOST', '127.0.0.1');
 define('DB_NAME', 'bam');
-define('DB_USER', 'bam_user');
-define('DB_PASS', 'password_sicura');
+define('DB_USER', 'root');
+define('DB_PASS', '');
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
 define('MAX_FILE_MB', 50);
 
