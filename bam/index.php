@@ -8,7 +8,10 @@ session_start();
 // ============================================================
 // CONFIG
 // ============================================================
-define('DB_PATH',    __DIR__ . '/bam.sqlite');
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'bam');
+define('DB_USER', 'bam_user');
+define('DB_PASS', 'password_sicura');
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
 define('MAX_FILE_MB', 50);
 
@@ -30,11 +33,11 @@ if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0755, true);
 function db(): PDO {
     static $pdo = null;
     if (!$pdo) {
-        $pdo = new PDO('sqlite:' . DB_PATH, null, null, [
+        $pdo = new PDO('mysql:host='.DB_HOST.';dbname='.DB_NAME.';charset=utf8mb4', DB_USER, DB_PASS, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
-        $pdo->exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
+        $pdo->exec("SET NAMES utf8mb4");
         db_init($pdo);
     }
     return $pdo;
@@ -43,53 +46,65 @@ function db(): PDO {
 function db_init(PDO $pdo): void {
     $pdo->exec("
     CREATE TABLE IF NOT EXISTS users (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        email      TEXT UNIQUE NOT NULL,
-        password   TEXT NOT NULL,
-        nome       TEXT DEFAULT '',
-        ruolo      TEXT DEFAULT 'user',
+        id         INT PRIMARY KEY AUTO_INCREMENT,
+        email      VARCHAR(255) UNIQUE NOT NULL,
+        password   VARCHAR(255) NOT NULL,
+        nome       VARCHAR(255) DEFAULT '',
+        ruolo      VARCHAR(50) DEFAULT 'user',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+    ) ENGINE=InnoDB;
+    ");
+    $pdo->exec("
     CREATE TABLE IF NOT EXISTS applicazioni (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_unit TEXT NOT NULL,
-        settore       TEXT NOT NULL,
-        regione       TEXT NOT NULL,
-        cliente       TEXT NOT NULL,
+        id            INT PRIMARY KEY AUTO_INCREMENT,
+        business_unit VARCHAR(255) NOT NULL,
+        settore       VARCHAR(255) NOT NULL,
+        regione       VARCHAR(255) NOT NULL,
+        cliente       VARCHAR(255) NOT NULL,
         problema      TEXT NOT NULL,
-        prodotto_alc  TEXT NOT NULL,
-        note          TEXT DEFAULT '',
-        media_path    TEXT,
-        media_type    TEXT,
-        user_id       INTEGER REFERENCES users(id),
-        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+        prodotto_alc  VARCHAR(255) NOT NULL,
+        note          TEXT DEFAULT NULL,
+        media_path    VARCHAR(500) DEFAULT NULL,
+        media_type    VARCHAR(100) DEFAULT NULL,
+        user_id       INT,
+        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    ) ENGINE=InnoDB;
+    ");
+    $pdo->exec("
     CREATE TABLE IF NOT EXISTS role_app_permissions (
-        ruolo TEXT NOT NULL,
-        app   TEXT NOT NULL,
-        mode  TEXT NOT NULL DEFAULT 'view',
+        ruolo VARCHAR(50) NOT NULL,
+        app   VARCHAR(50) NOT NULL,
+        mode  VARCHAR(20) NOT NULL DEFAULT 'view',
         PRIMARY KEY (ruolo, app)
-    );
+    ) ENGINE=InnoDB;
+    ");
+    $pdo->exec("
     CREATE TABLE IF NOT EXISTS bam_section_edit (
-        ruolo    TEXT NOT NULL,
-        sezione  TEXT NOT NULL,
-        can_edit INTEGER DEFAULT 0,
+        ruolo    VARCHAR(50) NOT NULL,
+        sezione  VARCHAR(50) NOT NULL,
+        can_edit TINYINT(1) DEFAULT 0,
         PRIMARY KEY (ruolo, sezione)
-    );
+    ) ENGINE=InnoDB;
+    ");
+    $pdo->exec("
     CREATE TABLE IF NOT EXISTS prodotti_alc (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        codice        TEXT NOT NULL,
-        business_unit TEXT NOT NULL,
-        tipo          TEXT DEFAULT '',
-        attributo     TEXT DEFAULT ''
-    );
+        id            INT PRIMARY KEY AUTO_INCREMENT,
+        codice        VARCHAR(255) NOT NULL,
+        business_unit VARCHAR(255) NOT NULL,
+        tipo          VARCHAR(255) DEFAULT '',
+        attributo     VARCHAR(255) DEFAULT ''
+    ) ENGINE=InnoDB;
+    ");
+    $pdo->exec("
     CREATE TABLE IF NOT EXISTS password_resets (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        token      TEXT NOT NULL UNIQUE,
+        id         INT PRIMARY KEY AUTO_INCREMENT,
+        user_id    INT NOT NULL,
+        token      VARCHAR(255) NOT NULL UNIQUE,
         expires_at DATETIME NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB;
     ");
     // Default admin user
     if (!$pdo->query("SELECT id FROM users LIMIT 1")->fetchColumn()) {
@@ -103,11 +118,11 @@ function db_init(PDO $pdo): void {
     // Normalizza business_unit in prodotti_alc (fix import case-insensitive)
     $pdo->exec("UPDATE prodotti_alc SET business_unit='K System' WHERE LOWER(business_unit)='k system' AND business_unit!='K System'");
     $pdo->exec("UPDATE prodotti_alc SET business_unit='K Thermo' WHERE LOWER(business_unit)='k thermo' AND business_unit!='K Thermo'");
-    // Utente l.motta (INSERT OR IGNORE — non sovrascrive se già esistente)
-    $pdo->prepare("INSERT OR IGNORE INTO users (email, password, nome, ruolo) VALUES (?, ?, ?, ?)")
+    // Utente l.motta (INSERT IGNORE — non sovrascrive se già esistente)
+    $pdo->prepare("INSERT IGNORE INTO users (email, password, nome, ruolo) VALUES (?, ?, ?, ?)")
         ->execute(['l.motta@alcgruppo.com', password_hash('admin', PASSWORD_DEFAULT), 'Luca Motta', 'admin']);
-    // Default app permissions (INSERT OR IGNORE = non sovrascrive personalizzazioni)
-    $ap = $pdo->prepare("INSERT OR IGNORE INTO role_app_permissions (ruolo,app,mode) VALUES(?,?,?)");
+    // Default app permissions (INSERT IGNORE = non sovrascrive personalizzazioni)
+    $ap = $pdo->prepare("INSERT IGNORE INTO role_app_permissions (ruolo,app,mode) VALUES(?,?,?)");
     foreach ([
         ['admin','bam','edit'],['admin','app1','edit'],['admin','app2','edit'],['admin','app3','edit'],
         ['responsabile','bam','edit'],['responsabile','app1','edit'],['responsabile','app2','edit'],['responsabile','app3','edit'],
@@ -116,7 +131,7 @@ function db_init(PDO $pdo): void {
     ] as $r) $ap->execute($r);
     // Default BAM section-edit permissions
     // admin: tutto | responsabile: no note_interne | utente: no note_interne, no media | viewer: niente
-    $sp = $pdo->prepare("INSERT OR IGNORE INTO bam_section_edit (ruolo,sezione,can_edit) VALUES(?,?,?)");
+    $sp = $pdo->prepare("INSERT IGNORE INTO bam_section_edit (ruolo,sezione,can_edit) VALUES(?,?,?)");
     foreach ([
         ['admin','anagrafica',1],['admin','prodotto',1],['admin','note_interne',1],['admin','media',1],
         ['responsabile','anagrafica',1],['responsabile','prodotto',1],['responsabile','note_interne',0],['responsabile','media',1],
@@ -310,7 +325,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = trim($_POST['token'] ?? '');
         $pw1   = $_POST['pw1'] ?? '';
         $pw2   = $_POST['pw2'] ?? '';
-        $stmt  = db()->prepare("SELECT r.user_id FROM password_resets r WHERE r.token=? AND r.expires_at > datetime('now')");
+        $stmt  = db()->prepare("SELECT r.user_id FROM password_resets r WHERE r.token=? AND r.expires_at > NOW()");
         $stmt->execute([$token]);
         $row = $stmt->fetch();
         if (!$row) {
@@ -468,7 +483,7 @@ if ($p === 'admin' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (in_array($ext, ['csv', 'txt'])) {
                 $handle = fopen($file['tmp_name'], 'r');
                 $firstRow = true;
-                $ins = db()->prepare("INSERT OR IGNORE INTO prodotti_alc (codice,business_unit,tipo,attributo) VALUES (?,?,?,?)");
+                $ins = db()->prepare("INSERT IGNORE INTO prodotti_alc (codice,business_unit,tipo,attributo) VALUES (?,?,?,?)");
                 while (($row = fgetcsv($handle, 1000, ';')) !== false) {
                     // Prova anche separatore virgola se punto e virgola non funziona
                     if (count($row) < 2 && strpos($row[0] ?? '', ',') !== false) {
@@ -563,7 +578,7 @@ $stats = [];
 $recenti = [];
 if ($p === 'welcome') {
     $stats['totale']       = db()->query("SELECT COUNT(*) FROM applicazioni")->fetchColumn();
-    $stats['mese']         = db()->query("SELECT COUNT(*) FROM applicazioni WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now')")->fetchColumn();
+    $stats['mese']         = db()->query("SELECT COUNT(*) FROM applicazioni WHERE DATE_FORMAT(created_at,'%Y-%m')=DATE_FORMAT(NOW(),'%Y-%m')")->fetchColumn();
     $stats['clienti']      = db()->query("SELECT COUNT(DISTINCT cliente) FROM applicazioni")->fetchColumn();
     $stats['bu_ksystem']   = db()->query("SELECT COUNT(*) FROM applicazioni WHERE business_unit='K System'")->fetchColumn();
     $stats['bu_ktermo']    = db()->query("SELECT COUNT(*) FROM applicazioni WHERE business_unit='K Thermo'")->fetchColumn();
@@ -1265,7 +1280,7 @@ elseif ($p === 'reset'):
   // Verifica validità token
   $tokenValid = false;
   if ($resetToken) {
-      $chk = db()->prepare("SELECT id FROM password_resets WHERE token=? AND expires_at > datetime('now')");
+      $chk = db()->prepare("SELECT id FROM password_resets WHERE token=? AND expires_at > NOW()");
       $chk->execute([$resetToken]);
       $tokenValid = (bool)$chk->fetch();
   }
